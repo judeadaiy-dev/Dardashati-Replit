@@ -1,0 +1,63 @@
+import 'package:flutter/material.dart';
+import 'models.dart';
+
+class AppThemes {
+  static List<AppThemeData> allThemes = [
+    AppThemeData(
+      name: 'natural_garden',
+      label: 'حديقة الطبيعة (زجاجي)',
+      background: Color(0xFFF0F4F0),
+      text: Color(0xFF2D3A2D),
+      button: Color(0xFF5BA890),
+      buttonText: Colors.white,
+      accent: Color(0xFF82C4AC),
+      card: Colors.white.withOpacity(0.6),
+      menu: Color(0xFFD8E9D8).withOpacity(0.8),
+      fontFamily: 'Tajawal',
+      iconStyle: IconStyle.bold,
+      isDark: false,
+    ),
+    AppThemeData(
+      name: 'soft_glass',
+      label: 'مودرن زجاجي',
+      background: Color(0xFFF8FAFD),
+      text: Color(0xFF1E293B),
+      button: Color(0xFF3B82F6),
+      buttonText: Colors.white,
+      accent: Color(0xFF60A5FA),
+      card: Colors.white.withOpacity(0.7),
+      menu: Color(0xFFF1F5F9).withOpacity(0.9),
+      fontFamily: 'Cairo',
+      iconStyle: IconStyle.minimal,
+      isDark: false,
+    ),
+    AppThemeData(
+      name: 'royal_gold',
+      label: 'الملكي المذهب',
+      background: Color(0xFF1A1A1A),
+      text: Color(0xFFEFDEC1),
+      button: Color(0xFFD4AF37),
+      buttonText: Color(0xFF1A1A1A),
+      accent: Color(0xFFF9F1D2),
+      card: Color(0xFFD4AF25).withOpacity(0.08),
+      menu: Color(0xFF2C2C2C),
+      fontFamily: 'Tajawal',
+      iconStyle: IconStyle.bold,
+      isDark: true,
+    ),
+    AppThemeData(
+      name: 'night_forest',
+      label: 'الغابة الليلية (رسمي)',
+      background: Color(0xFF0D1310),
+      text: Color(0xFFE8F5E9),
+      button: Color(0xFF2E7D32),
+      buttonText: Colors.white,
+      accent: Color(0xFF66BB6A),
+      card: Colors.white.withOpacity(0.04),
+      menu: Color(0xFF0D1310).withOpacity(0.95),
+      fontFamily: 'Tajawal',
+      iconStyle: IconStyle.bold,
+      isDark: true,
+    ),
+  ];
+}

@@ -1,0 +1,200 @@
+import 'package:flutter/material.dart';
+import 'models.dart';
+import 'services/database_service.dart';
+import 'mock_data.dart';
+import 'profile_screen.dart';
+import 'room_chat_screen.dart';
+
+class SearchScreen extends StatefulWidget {
+  final AppThemeData theme;
+  final AppUser currentUser;
+  const SearchScreen({required this.theme, required this.currentUser});
+
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final _ctrl = TextEditingController();
+  List<AppUser> _users = [];
+  List<AppRoom> _rooms = [];
+  bool _searching = false;
+  String _lastQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String query) async {
+    if (query.trim() == _lastQuery) return;
+    _lastQuery = query.trim();
+    if (query.trim().isEmpty) { setState(() { _users = []; _rooms = []; }); return; }
+    setState(() => _searching = true);
+    try {
+      final users = await DatabaseService.searchUsers(query);
+      final rooms = await DatabaseService.searchRooms(query);
+      if (mounted) setState(() { _users = users; _rooms = rooms; _searching = false; });
+    } catch (_) {
+      // fallback
+      final q = query.toLowerCase();
+      if (mounted) setState(() {
+        _users = mockUsers.where((u) => u.fullName.toLowerCase().contains(q)).toList();
+        _rooms = mockRooms.where((r) => r.name.toLowerCase().contains(q) || r.description.toLowerCase().contains(q)).toList();
+        _searching = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.theme;
+    return SafeArea(
+      child: Column(children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Text('البحث', style: TextStyle(color: t.text, fontSize: 26, fontWeight: FontWeight.w900)),
+        ),
+
+        // Search Bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(20), border: Border.all(color: t.text.withOpacity(0.1))),
+            child: Row(children: [
+              _searching
+                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.button))
+                  : Icon(Icons.search, color: t.text.withOpacity(0.4), size: 22),
+              const SizedBox(width: 10),
+              Expanded(child: TextField(
+                controller: _ctrl,
+                style: TextStyle(color: t.text, fontSize: 14),
+                textAlign: TextAlign.right,
+                decoration: InputDecoration(hintText: 'ابحث عن مستخدمين أو غرف...', hintStyle: TextStyle(color: t.text.withOpacity(0.3)), border: InputBorder.none),
+                onChanged: (v) { if (v.length >= 2 || v.isEmpty) _search(v); },
+              )),
+              if (_ctrl.text.isNotEmpty) GestureDetector(onTap: () { _ctrl.clear(); setState(() { _users = []; _rooms = []; _lastQuery = ''; }); }, child: Icon(Icons.close, color: t.text.withOpacity(0.4), size: 20)),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Tabs
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: t.text.withOpacity(0.08))),
+          child: TabBar(
+            controller: _tabController,
+            indicatorColor: t.button,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicatorPadding: const EdgeInsets.all(4),
+            indicator: BoxDecoration(color: t.button, borderRadius: BorderRadius.circular(12)),
+            labelColor: t.buttonText,
+            unselectedLabelColor: t.text.withOpacity(0.5),
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            tabs: [
+              Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.person_outline, size: 16), const SizedBox(width: 4), Text('أشخاص (${_users.length})')])),
+              Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.chat_bubble_outline, size: 16), const SizedBox(width: 4), Text('غرف (${_rooms.length})')])),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Results
+        Expanded(child: TabBarView(
+          controller: _tabController,
+          children: [
+            _usersTab(t),
+            _roomsTab(t),
+          ],
+        )),
+      ]),
+    );
+  }
+
+  Widget _usersTab(AppThemeData t) {
+    if (_ctrl.text.isEmpty) return _hint(t, 'ابحث عن أصدقاء بالاسم', Icons.people_alt_outlined);
+    if (_users.isEmpty && !_searching) return _hint(t, 'لا توجد نتائج', Icons.search_off);
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _users.length,
+      itemBuilder: (ctx, i) {
+        final u = _users[i];
+        return GestureDetector(
+          onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => ProfileScreen(userId: u.id, currentUserId: widget.currentUser.id, theme: t))),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: t.text.withOpacity(0.07))),
+            child: Row(children: [
+              Stack(children: [
+                CircleAvatar(backgroundImage: u.avatarUrl.isNotEmpty ? NetworkImage(u.avatarUrl) : null, radius: 24, backgroundColor: t.button.withOpacity(0.2), child: u.avatarUrl.isEmpty ? Text(u.fullName[0], style: TextStyle(color: t.button)) : null),
+                if (u.isOnline) Positioned(bottom: 0, right: 0, child: Container(width: 10, height: 10, decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: t.card, width: 2)))),
+              ]),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(u.fullName, style: TextStyle(color: t.text, fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 3),
+                Row(children: [
+                  if (u.zodiac != null) Text('${u.zodiac} • ', style: TextStyle(color: t.text.withOpacity(0.4), fontSize: 11)),
+                  Text(u.isOnline ? 'متصل' : 'غير متصل', style: TextStyle(color: u.isOnline ? Colors.green : t.text.withOpacity(0.4), fontSize: 11)),
+                ]),
+              ])),
+              Icon(Icons.arrow_forward_ios, size: 14, color: t.text.withOpacity(0.3)),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _roomsTab(AppThemeData t) {
+    if (_ctrl.text.isEmpty) return _hint(t, 'ابحث عن غرفة بالاسم أو الوصف', Icons.chat_bubble_outline);
+    if (_rooms.isEmpty && !_searching) return _hint(t, 'لا توجد نتائج', Icons.search_off);
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _rooms.length,
+      itemBuilder: (ctx, i) {
+        final r = _rooms[i];
+        return GestureDetector(
+          onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => RoomChatScreen(room: r, currentUser: widget.currentUser, theme: t))),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: t.text.withOpacity(0.07))),
+            child: Row(children: [
+              Container(width: 48, height: 48, decoration: BoxDecoration(color: t.button.withOpacity(0.1), borderRadius: BorderRadius.circular(14)), child: Center(child: Text(r.icon, style: const TextStyle(fontSize: 24)))),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(r.name, style: TextStyle(color: t.text, fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 3),
+                Text(r.description, style: TextStyle(color: t.text.withOpacity(0.4), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ])),
+              if (r.isFeatured) Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: t.button.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Text('مميزة', style: TextStyle(color: t.button, fontSize: 10, fontWeight: FontWeight.bold))),
+              Icon(Icons.arrow_forward_ios, size: 14, color: t.text.withOpacity(0.3)),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _hint(AppThemeData t, String msg, IconData icon) {
+    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(icon, size: 50, color: t.text.withOpacity(0.15)),
+      const SizedBox(height: 14),
+      Text(msg, style: TextStyle(color: t.text.withOpacity(0.3), fontSize: 14)),
+    ]));
+  }
+}
