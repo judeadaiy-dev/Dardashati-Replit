@@ -6,29 +6,33 @@ plugins {
 
 android {
     namespace "com.tikchat.app"
-    compileSdk flutter.compileSdkVersion
+    // تحديث ليتوافق مع أحدث متطلبات أندرويد
+    compileSdk 34 
     ndkVersion flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17 // تحديث ليتوافق مع Gradle 8.7
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17' // تحديث ليتوافق مع Java 17
     }
 
     defaultConfig {
         applicationId "com.tikchat.app"
         minSdkVersion 21
-        targetSdkVersion flutter.targetSdkVersion
+        targetSdkVersion 34 // تحديث ليتوافق مع متطلبات المتجر الحالية
         versionCode 1
         versionName "1.0.0"
     }
 
     buildTypes {
         release {
+            // ملاحظة: تأكد لاحقاً من إضافة مفتاح توقيع (Signing Key) حقيقي بدلاً من debug
             signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }
