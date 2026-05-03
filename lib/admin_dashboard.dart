@@ -938,18 +938,29 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text('إلغاء', style: TextStyle(color: widget.currentTheme.text.withOpacity(0.4)))),
           ElevatedButton(
-            onPressed: () async {
+                        onPressed: () async {
               Navigator.pop(context);
               try { await DatabaseService.banUser(u.id, !isBanned); } catch (_) {}
               await _loadUsers();
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isBanned ? 'تم رفع الحظر عن ${u.fullName}' : 'تم حظر ${u.fullName}'), backgroundColor: isBanned ? Colors.green.shade600 : Colors.red.shade600));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(isBanned ? 'تم رفع الحظر عن ${u.fullName}' : 'تم حظر ${u.fullName}'),
+                    backgroundColor: isBanned ? Colors.green.shade600 : Colors.red.shade600,
+                  ),
+                );
+              }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: isBanned ? Colors.green.shade600 : Colors.red.shade600, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isBanned ? Colors.green.shade600 : Colors.red.shade600,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: Text(isBanned ? 'رفع الحظر' : 'حظر', style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
+}
 
-  // =============
+
