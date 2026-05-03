@@ -1,3 +1,4 @@
+// يجب أن تبدأ بحرف صغير 'buildscript' لأنها كلمة محجوزة في Gradle
 buildscript {
     ext.kotlin_version = '1.9.22'
     repositories {
@@ -5,7 +6,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // تم استخدام إصدار مستقر لضمان التوافق مع Gradle 8.2
+        // هذا الإصدار متوافق تماماً مع Gradle 8.2 الذي وضعناه في الـ Wrapper
         classpath 'com.android.tools.build:gradle:8.1.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
