@@ -5,8 +5,8 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // تم تغيير الإصدار لضمان توافق أعلى مع مشاريع فلاتر
-        classpath 'com.android.tools.build:gradle:7.4.2'
+        // تم استخدام إصدار مستقر لضمان التوافق مع Gradle 8.2
+        classpath 'com.android.tools.build:gradle:8.1.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -21,7 +21,6 @@ allprojects {
 rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
-    // دمجنا التبعية هنا لتنظيف الكود
     project.evaluationDependsOn(':app')
 }
 
