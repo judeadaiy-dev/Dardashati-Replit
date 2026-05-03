@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 enum IconStyle { minimal, bold, soft }
 
 // ==================== Models ====================
+enum FilterType { all, online, banned, pending }
 
 class AppUser {
   final String id;
