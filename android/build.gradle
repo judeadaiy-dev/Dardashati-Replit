@@ -5,7 +5,8 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.3.2'
+        // تم التغيير ليتوافق مع Gradle 8.4 الذي وضعناه في ملف الخصائص
+        classpath 'com.android.tools.build:gradle:8.2.0' 
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
