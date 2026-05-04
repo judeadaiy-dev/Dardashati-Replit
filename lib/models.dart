@@ -56,104 +56,32 @@ class AppUser {
   bool get isModerator => role == 'moderator' || role == 'admin';
 }
 
-class AppRoom {
-  final String id;
-  final String name;
-  final String icon;
-  final String description;
-  final String ownerId;
-  final bool isFeatured;
-  final int membersCount;
-
-  AppRoom({
-    required this.id,
-    required this.name,
-    required this.icon,
-    required this.description,
-    required this.ownerId,
-    this.isFeatured = false,
-    this.membersCount = 0,
-  });
-
-  factory AppRoom.fromMap(Map<String, dynamic> map) {
-    return AppRoom(
-      id: map['id'] as String,
-      name: map['name'] as String? ?? '',
-      icon: map['icon'] as String? ?? '💬',
-      description: map['description'] as String? ?? '',
-      ownerId: map['owner_id'] as String? ?? '',
-      isFeatured: map['is_featured'] as bool? ?? false,
-      membersCount: map['members_count'] as int? ?? 0,
-    );
-  }
-}
-
-class AppMessage {
-  final String id;
-  final String senderId;
-  final String senderName;
-  final String senderAvatar;
-  final String content;
-  final DateTime time;
-  final bool isAudio;
-  final String? audioDuration;
-  final String? replyToContent;
-  final String? replyToSender;
-
-  AppMessage({
-    required this.id,
-    required this.senderId,
-    required this.senderName,
-    required this.senderAvatar,
-    required this.content,
-    required this.time,
-    this.isAudio = false,
-    this.audioDuration,
-    this.replyToContent,
-    this.replyToSender,
-  });
-
-  factory AppMessage.fromMap(Map<String, dynamic> map) {
-    final sender = map['sender'] as Map<String, dynamic>?;
-    final replyTo = map['reply_to'] as Map<String, dynamic>?;
-    final replySender = replyTo?['sender'] as Map<String, dynamic>?;
-    return AppMessage(
-      id: map['id'] as String,
-      senderId: map['sender_id'] as String? ?? '',
-      senderName: sender?['full_name'] as String? ?? '',
-      senderAvatar: sender?['avatar_url'] as String? ?? '',
-      content: map['content'] as String? ?? '',
-      time: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
-      isAudio: map['is_audio'] as bool? ?? false,
-      audioDuration: map['audio_duration'] as String?,
-      replyToContent: replyTo?['content'] as String?,
-      replyToSender: replySender?['full_name'] as String?,
-    );
-  }
-}
-
-// ==================== التعديل المطلوب لحل أخطاء الـ Theme ====================
-
+// --- تحديث كلاس الثيم لحل أخطاء label, background, card ---
 class AppThemeData {
   final String name;
+  final String label; // أضفنا الحقل المطلوب
   final Color primaryColor;
   final List<Color> gradientColors;
-  final double borderRadius;
-  
-  // الحقول الجديدة المطلوبة في ملف profile_screen.dart ✅
+  final Color background; // أضفنا الحقل المطلوب
   final Color text;   
   final Color button; 
+  final Color card; // أضفنا الحقل المطلوب
+  final double borderRadius;
 
   AppThemeData({
     required this.name,
+    required this.label,
     required this.primaryColor,
     required this.gradientColors,
-    required this.text,    // تمت إضافتها هنا
-    required this.button,  // تمت إضافتها هنا
+    required this.background,
+    required this.text,    
+    required this.button,  
+    required this.card,
     this.borderRadius = 30.0,
   });
 }
 
+// --- تحديث طلبات الغرف لحل خطأ name ---
 class AppRoomRequest {
   final String id;
   final String userId;
@@ -169,6 +97,9 @@ class AppRoomRequest {
     required this.createdAt,
   });
 
+  // الـ Getter الذي يطلبه ملف admin_dashboard
+  String get name => roomName;
+
   factory AppRoomRequest.fromMap(Map<String, dynamic> map) {
     return AppRoomRequest(
       id: map['id'] as String,
@@ -180,12 +111,14 @@ class AppRoomRequest {
   }
 }
 
+// --- تحديث التقارير لحل خطأ targetName ---
 class AppReport {
   final String id;
   final String reporterId;
   final String reportedId;
   final String reason;
   final DateTime timestamp;
+  final String? targetName; // أضفنا الحقل المطلوب
 
   AppReport({
     required this.id,
@@ -193,6 +126,7 @@ class AppReport {
     required this.reportedId,
     required this.reason,
     required this.timestamp,
+    this.targetName,
   });
 
   factory AppReport.fromMap(Map<String, dynamic> map) {
@@ -202,7 +136,7 @@ class AppReport {
       reportedId: map['reported_id'] as String? ?? '',
       reason: map['reason'] as String? ?? '',
       timestamp: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
+      targetName: map['target_name'] as String?,
     );
   }
 }
-
