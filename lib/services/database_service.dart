@@ -188,10 +188,15 @@ class DatabaseService {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'room_messages',
-          filter: PostgresChangeFilter(type: FilterType.eq, column: 'room_id', value: roomId),
-          callback: (payload) => onInsert(payload.newRecord),
-        )
-        .subscribe();
+          filter:         PostgresChangeFilter(
+          type: 'eq', 
+          column: 'room_id', 
+          value: roomId
+        ),
+        callback: (payload) => onInsert(payload.newRecord),
+      )
+      .subscribe();
+
   }
 
   // ==================== الرسائل الخاصة ====================
