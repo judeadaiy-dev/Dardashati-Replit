@@ -38,7 +38,7 @@ class DatabaseService {
     return (data as List).map((m) => AppUser.fromMap(m)).toList();
   }
 
-  // ==================== المتابعات (Follows) - الدوال المضافة لإصلاح أخطاء البروفايل ====================
+  // ==================== المتابعات (Follows) ====================
   static Future<bool> isFollowing(String targetId) async {
     if (_uid == null) return false;
     final data = await _db.from('follows').select().eq('follower_id', _uid!).eq('following_id', targetId).maybeSingle();
@@ -69,7 +69,7 @@ class DatabaseService {
     } catch (_) { return 0; }
   }
 
-  // ==================== الغرف (Rooms) - إضافة دالة البحث لإصلاح أخطاء البحث ====================
+  // ==================== الغرف (Rooms) ====================
   static Future<List<AppRoom>> getRooms() async {
     final data = await _db.from('rooms').select().eq('is_active', true).order('is_featured', ascending: false);
     return (data as List).map((m) => AppRoom.fromMap(m)).toList();
@@ -78,6 +78,12 @@ class DatabaseService {
   static Future<List<AppRoom>> searchRooms(String query) async {
     final data = await _db.from('rooms').select().ilike('name', '%$query%').limit(30);
     return (data as List).map((m) => AppRoom.fromMap(m)).toList();
+  }
+
+  // دالة جلب طلبات الغرف الجديدة للوحة الإدارة
+  static Future<List<AppRoomRequest>> getRoomRequests() async {
+    final data = await _db.from('room_requests').select().order('created_at', ascending: false);
+    return (data as List).map((m) => AppRoomRequest.fromMap(m)).toList();
   }
 
   static Future<void> joinRoom(String roomId) async {
@@ -120,13 +126,21 @@ class DatabaseService {
     await _db.from('user_settings').upsert({'user_id': _uid!, 'theme_name': themeName});
   }
 
-  // ==================== الإدارة والتقارير - إضافة دالة التحديث لإصلاح أخطاء الأدمن ====================
+  // ==================== الإدارة والتقارير ====================
+  
+  // دالة جلب كافة البلاغات للوحة الإدارة (تم إصلاح الخطأ هنا)
+  static Future<List<AppReport>> getReports() async {
+    final data = await _db.from('reports').select().order('created_at', ascending: false);
+    return (data as List).map((m) => AppReport.fromMap(m)).toList();
+  }
+
   static Future<void> submitReport({required String targetId, required String reason}) async {
     if (_uid == null) return;
     await _db.from('reports').insert({
       'reporter_id': _uid!, 
       'target_id': targetId, 
       'reason': reason,
+      'status': 'pending',
       'created_at': DateTime.now().toIso8601String(),
     });
   }
@@ -135,3 +149,4 @@ class DatabaseService {
     await _db.from('reports').update({'status': status}).eq('id', reportId);
   }
 }
+
