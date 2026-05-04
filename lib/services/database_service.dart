@@ -1,6 +1,4 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-// إضافة هذا الاستيراد لضمان التعرف على أنواع الفلاتر
-import 'package:supabase_flutter/src/realtime_client_ext.dart'; 
 import 'supabase_service.dart';
 import 'auth_service.dart';
 import '../models.dart';
@@ -9,13 +7,65 @@ class DatabaseService {
   static final _db = SupabaseService.client;
   static String? get _uid => AuthService.currentUserId;
 
-  // ==================== المستخدمون والغرف ====================
-
+  // ==================== المستخدمون ====================
   static Future<List<AppUser>> getUsers() async {
     final data = await _db.from('profiles').select().order('created_at');
     return (data as List).map((m) => AppUser.fromMap(m)).toList();
   }
 
+  static Future<AppUser?> getUserById(String id) async {
+    try {
+      final data = await _db.from('profiles').select().eq('id', id).single();
+      return AppUser.fromMap(data);
+    } catch (_) { return null; }
+  }
+
+  static Future<void> updateProfile({required String fullName, String? bio, String? avatarUrl}) async {
+    if (_uid == null) return;
+    await _db.from('profiles').update({
+      'full_name': fullName,
+      if (bio != null) 'bio': bio,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
+    }).eq('id', _uid!);
+  }
+
+  static Future<void> banUser(String userId, bool ban) async {
+    await _db.from('profiles').update({'is_banned': ban}).eq('id', userId);
+  }
+
+  static Future<List<AppUser>> searchUsers(String query) async {
+    final data = await _db.from('profiles').select().ilike('full_name', '%$query%').limit(30);
+    return (data as List).map((m) => AppUser.fromMap(m)).toList();
+  }
+
+  // ==================== المتابعات ====================
+  static Future<bool> isFollowing(String targetId) async {
+    if (_uid == null) return false;
+    final data = await _db.from('follows').select().eq('follower_id', _uid!).eq('following_id', targetId).maybeSingle();
+    return data != null;
+  }
+
+  static Future<void> toggleFollow(String targetId) async {
+    if (_uid == null) return;
+    final following = await isFollowing(targetId);
+    if (following) {
+      await _db.from('follows').delete().eq('follower_id', _uid!).eq('following_id', targetId);
+    } else {
+      await _db.from('follows').insert({'follower_id': _uid!, 'following_id': targetId});
+    }
+  }
+
+  static Future<int> getFollowersCount(String userId) async {
+    final data = await _db.from('follows').select().eq('following_id', userId);
+    return (data as List).length;
+  }
+
+  static Future<int> getFollowingCount(String userId) async {
+    final data = await _db.from('follows').select().eq('follower_id', userId);
+    return (data as List).length;
+  }
+
+  // ==================== الغرف والرسائل ====================
   static Future<List<AppRoom>> getRooms() async {
     final data = await _db.from('rooms').select().eq('is_active', true).order('is_featured', ascending: false);
     return (data as List).map((m) => AppRoom.fromMap(m)).toList();
@@ -26,101 +76,76 @@ class DatabaseService {
     await _db.from('room_members').upsert({'room_id': roomId, 'user_id': _uid!});
   }
 
-  static Future<List<AppUser>> getRoomMembers(String roomId) async {
-    final data = await _db.from('room_members').select('profiles(*)').eq('room_id', roomId);
-    return (data as List).map((m) => AppUser.fromMap(m['profiles'])).toList();
+  static Future<void> sendRoomMessage({required String roomId, required String content, String? replyToId}) async {
+    if (_uid == null) return;
+    await _db.from('room_messages').insert({
+      'room_id': roomId,
+      'sender_id': _uid!,
+      'content': content,
+      'reply_to_id': replyToId,
+    });
   }
-
-  static Future<List<AppRoom>> searchRooms(String query) async {
-    final data = await _db.from('rooms').select().ilike('name', '%$query%').eq('is_active', true);
-    return (data as List).map((m) => AppRoom.fromMap(m)).toList();
-  }
-
-  // ==================== الرسائل والإشعارات ====================
 
   static Future<List<AppMessage>> getRoomMessages(String roomId) async {
-    final data = await _db.from('room_messages').select('*, sender:profiles(*)').eq('room_id', roomId).eq('is_deleted', false).order('created_at').limit(100);
+    final data = await _db.from('room_messages').select('*, sender:profiles(*)').eq('room_id', roomId).order('created_at');
     return (data as List).map((m) => AppMessage.fromMap(m)).toList();
   }
 
-  static Future<void> sendRoomMessage({required String roomId, required String content, String? replyToId}) async {
-    if (_uid == null) return;
-    await _db.from('room_messages').insert({'room_id': roomId, 'sender_id': _uid!, 'content': content, 'reply_to_id': replyToId});
-  }
-
-  static RealtimeChannel subscribeToRoomMessages(String roomId, void Function(Map<String, dynamic>) onInsert) {
-    return _db.channel('room_messages_$roomId').onPostgresChanges(
+  static RealtimeChannel subscribeToRoomMessages(String roomId, Function(Map) onInsert) {
+    return _db.channel('room_$roomId').onPostgresChanges(
       event: PostgresChangeEvent.insert,
       schema: 'public',
       table: 'room_messages',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq, // استخدام الـ Enum مباشرة
-        column: 'room_id',
-        value: roomId,
-      ),
+      // ملاحظة: إذا ظهر خطأ في النوع، جرب تبديل 'eq' بـ PostgresChangeFilterType.eq
+      filter: PostgresChangeFilter(type: 'eq', column: 'room_id', value: roomId),
       callback: (payload) => onInsert(payload.newRecord),
     ).subscribe();
   }
 
-  static Future<int> getUnreadNotificationsCount() async {
-    if (_uid == null) return 0;
-    final data = await _db.from('notifications').select().eq('user_id', _uid!).eq('is_read', false);
-    return (data as List).length;
+  // ==================== الرسائل الخاصة ====================
+  static Future<List<AppMessage>> getPrivateMessages(String otherId) async {
+    if (_uid == null) return [];
+    final data = await _db.from('private_messages').select('*, sender:profiles(*)').or('and(sender_id.eq.$_uid,receiver_id.eq.$otherId),and(sender_id.eq.$otherId,receiver_id.eq.$_uid)').order('created_at');
+    return (data as List).map((m) => AppMessage.fromMap(m)).toList();
   }
 
-  static RealtimeChannel subscribeToNotifications(void Function(AppNotification) onNew) {
-    return _db.channel('notif_$_uid').onPostgresChanges(
+  static Future<void> sendPrivateMessage({required String receiverId, required String content, String? replyToId}) async {
+    if (_uid == null) return;
+    await _db.from('private_messages').insert({'sender_id': _uid!, 'receiver_id': receiverId, 'content': content, 'reply_to_id': replyToId});
+  }
+
+  static Future<void> markPrivateMessagesRead(String otherId) async {
+    if (_uid == null) return;
+    await _db.from('private_messages').update({'is_read': true}).eq('sender_id', otherId).eq('receiver_id', _uid!);
+  }
+
+  static RealtimeChannel subscribeToPrivateMessages(String otherId, Function(Map) onInsert) {
+    return _db.channel('pvt_$otherId').onPostgresChanges(
       event: PostgresChangeEvent.insert,
       schema: 'public',
-      table: 'notifications',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq, 
-        column: 'user_id',
-        value: _uid ?? '',
-      ),
-      callback: (payload) => onNew(AppNotification.fromMap(payload.newRecord)),
+      table: 'private_messages',
+      callback: (payload) => onInsert(payload.newRecord),
     ).subscribe();
   }
 
-  // ==================== الإعدادات والثيم ====================
-
-  static Future<String> getUserTheme() async {
-    if (_uid == null) return 'natural_garden';
-    try {
-      final data = await _db.from('user_settings').select('theme_name').eq('user_id', _uid!).single();
-      return data['theme_name'] as String? ?? 'natural_garden';
-    } catch (_) { return 'natural_garden'; }
+  // ==================== الإشعارات والبلاغات ====================
+  static Future<List<AppNotification>> getNotifications() async {
+    if (_uid == null) return [];
+    final data = await _db.from('notifications').select().eq('user_id', _uid!).order('created_at', ascending: false);
+    return (data as List).map((m) => AppNotification.fromMap(m)).toList();
   }
 
-  static Future<void> saveUserTheme(String themeName) async {
+  static Future<void> markAllNotificationsRead() async {
     if (_uid == null) return;
-    await _db.from('user_settings').upsert({'user_id': _uid!, 'theme_name': themeName});
+    await _db.from('notifications').update({'is_read': true}).eq('user_id', _uid!);
   }
 
-  // ==================== الإدارة ====================
-
-  static Future<void> broadcastMessage(String message) async {
-    final users = await _db.from('profiles').select('id');
-    for (final user in users as List) {
-      await _db.from('notifications').insert({'user_id': user['id'], 'type': 'broadcast', 'title': 'إدارة دردشاتي', 'body': message});
-    }
+  static Future<void> markNotificationRead(String id) async {
+    await _db.from('notifications').update({'is_read': true}).eq('id', id);
   }
 
-  static Future<List<AppReport>> getReports() async {
-    final data = await _db.from('reports').select('*, reporter:profiles!reporter_id(*), target:profiles!target_id(*)');
-    return (data as List).map((m) => AppReport.fromMap(m)).toList();
-  }
-
-  static Future<List<AppRoomRequest>> getRoomRequests() async {
-    final data = await _db.from('room_requests').select('*, requester:profiles(*)');
-    return (data as List).map((m) => AppRoomRequest.fromMap(m)).toList();
-  }
-
-  static Future<void> updateRoomRequestStatus(String id, String status) async {
-    await _db.from('room_requests').update({'status': status}).eq('id', id);
-  }
-
-  static Future<void> updateReportStatus(String id, String status) async {
-    await _db.from('reports').update({'status': status}).eq('id', id);
+  static Future<void> submitReport({required String targetId, required String reason}) async {
+    if (_uid == null) return;
+    await _db.from('reports').insert({'reporter_id': _uid!, 'target_id': targetId, 'reason': reason});
   }
 }
