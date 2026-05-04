@@ -9,7 +9,6 @@ class DatabaseService {
 
   // ==================== المستخدمون (Profiles) ====================
   static Future<List<AppUser>> getUsers() async {
-    // تأكدنا من جلب الحقول الجديدة بما فيها email
     final data = await _db.from('profiles').select().order('created_at');
     return (data as List).map((m) => AppUser.fromMap(m)).toList();
   }
@@ -39,7 +38,7 @@ class DatabaseService {
     return (data as List).map((m) => AppUser.fromMap(m)).toList();
   }
 
-  // ==================== المتابعات (Follows) ====================
+  // ==================== المتابعات (Follows) - الدوال المضافة لإصلاح أخطاء البروفايل ====================
   static Future<bool> isFollowing(String targetId) async {
     if (_uid == null) return false;
     final data = await _db.from('follows').select().eq('follower_id', _uid!).eq('following_id', targetId).maybeSingle();
@@ -56,9 +55,28 @@ class DatabaseService {
     }
   }
 
-  // ==================== الغرف (Rooms) ====================
+  static Future<int> getFollowersCount(String userId) async {
+    try {
+      final res = await _db.from('follows').select('follower_id', const FetchOptions(count: CountOption.exact)).eq('following_id', userId);
+      return res.count;
+    } catch (_) { return 0; }
+  }
+
+  static Future<int> getFollowingCount(String userId) async {
+    try {
+      final res = await _db.from('follows').select('following_id', const FetchOptions(count: CountOption.exact)).eq('follower_id', userId);
+      return res.count;
+    } catch (_) { return 0; }
+  }
+
+  // ==================== الغرف (Rooms) - إضافة دالة البحث لإصلاح أخطاء البحث ====================
   static Future<List<AppRoom>> getRooms() async {
     final data = await _db.from('rooms').select().eq('is_active', true).order('is_featured', ascending: false);
+    return (data as List).map((m) => AppRoom.fromMap(m)).toList();
+  }
+
+  static Future<List<AppRoom>> searchRooms(String query) async {
+    final data = await _db.from('rooms').select().ilike('name', '%$query%').limit(30);
     return (data as List).map((m) => AppRoom.fromMap(m)).toList();
   }
 
@@ -69,7 +87,6 @@ class DatabaseService {
 
   // ==================== الرسائل (Messages) ====================
   static Future<List<AppMessage>> getRoomMessages(String roomId) async {
-    // إضافة ترتيب تصاعدي للتأكد من تسلسل المحادثة
     final data = await _db.from('room_messages').select('*, sender:profiles(*)').eq('room_id', roomId).order('created_at', ascending: true);
     return (data as List).map((m) => AppMessage.fromMap(m)).toList();
   }
@@ -89,10 +106,8 @@ class DatabaseService {
   }
 
   // ==================== الإشعارات والثيم ====================
-  
-  // تحديث الثيم الافتراضي ليتوافق مع التصميم الجديد
   static Future<String> getUserTheme() async {
-    const String defaultTheme = 'dardashati_wave'; // التغيير هنا ✅
+    const String defaultTheme = 'dardashati_wave';
     if (_uid == null) return defaultTheme;
     try {
       final data = await _db.from('user_settings').select('theme_name').eq('user_id', _uid!).single();
@@ -105,7 +120,7 @@ class DatabaseService {
     await _db.from('user_settings').upsert({'user_id': _uid!, 'theme_name': themeName});
   }
 
-  // ==================== الإدارة والتقارير ====================
+  // ==================== الإدارة والتقارير - إضافة دالة التحديث لإصلاح أخطاء الأدمن ====================
   static Future<void> submitReport({required String targetId, required String reason}) async {
     if (_uid == null) return;
     await _db.from('reports').insert({
@@ -114,5 +129,9 @@ class DatabaseService {
       'reason': reason,
       'created_at': DateTime.now().toIso8601String(),
     });
+  }
+
+  static Future<void> updateReportStatus(String reportId, String status) async {
+    await _db.from('reports').update({'status': status}).eq('id', reportId);
   }
 }
