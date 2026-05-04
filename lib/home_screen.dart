@@ -7,6 +7,8 @@ import 'private_chat_screen.dart';
 import 'settings_screen.dart';
 import 'notifications_screen.dart';
 import 'admin_dashboard.dart';
+import 'search_screen.dart'; // تأكد من وجود هذا الملف أو استبدله بـ Placeholder
+import 'profile_screen.dart'; // تأكد من وجود هذا الملف
 
 class HomeScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -48,15 +50,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final pages = [
       _RoomsTab(theme: t, currentUser: widget.currentUser),
       _MessagesTab(theme: t, currentUser: widget.currentUser),
-      const Center(child: Text("قريباً: البحث المتقدم")), // Placeholder
-      const Center(child: Text("ملفي الشخصي")), // Placeholder
+      SearchScreen(theme: t, currentUser: widget.currentUser), 
+      ProfileScreen(userId: widget.currentUser.id, currentUserId: widget.currentUser.id, theme: t),
     ];
 
     return Scaffold(
-      extendBody: true, // للسماح للمحتوى بالظهور خلف شريط التنقل الشفاف
+      extendBody: true,
       body: Stack(
         children: [
-          // خلفية بتدرج ناعم وأوربات ضبابية
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -66,7 +67,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          // دوائر خلفية ضبابية
           Positioned(top: -50, left: -50, child: _BlurOrb(color: const Color(0xFFC9BEFF).withOpacity(0.3), size: 250)),
           Positioned(bottom: 100, right: -50, child: _BlurOrb(color: const Color(0xFFA6ECE7).withOpacity(0.3), size: 200)),
           
@@ -127,12 +127,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ========================= بطاقة الغرف الزجاجية =========================
+// ========================= تبويب الغرف (معدل ليجلب البيانات) =========================
 
-class _RoomsTab extends StatelessWidget {
+class _RoomsTab extends StatefulWidget {
   final AppThemeData theme;
   final AppUser currentUser;
   const _RoomsTab({required this.theme, required this.currentUser});
+
+  @override
+  State<_RoomsTab> createState() => _RoomsTabState();
+}
+
+class _RoomsTabState extends State<_RoomsTab> {
+  List<AppRoom> _rooms = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchRooms();
+  }
+
+  Future<void> _fetchRooms() async {
+    try {
+      final rooms = await DatabaseService.getRooms();
+      if (mounted) setState(() { _rooms = rooms; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,31 +168,153 @@ class _RoomsTab extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('دردشاتي', style: TextStyle(color: theme.text, fontSize: 28, fontWeight: FontWeight.w900)),
-                  Text('مرحباً، ${currentUser.fullName}', style: TextStyle(color: theme.text.withOpacity(0.6), fontSize: 14)),
+                  Text('دردشاتي', style: TextStyle(color: widget.theme.text, fontSize: 28, fontWeight: FontWeight.w900)),
+                  Text('مرحباً، ${widget.currentUser.fullName}', style: TextStyle(color: widget.theme.text.withOpacity(0.6), fontSize: 14)),
                 ]),
-                _CircularAction(icon: Icons.settings_suggest_outlined, theme: theme),
+                _CircularAction(icon: Icons.settings_suggest_outlined, theme: widget.theme),
               ],
             ),
           ),
         ),
-        // هنا يتم إضافة الـ ListView الخاص بالغرف بتصميم الـ Glass Card
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _GlassRoomCard(theme: theme), // سنقوم بربطها بالداتابيز لاحقاً
-              childCount: 5,
+        if (_loading)
+          const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()))
+        else
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _GlassRoomCard(theme: widget.theme, room: _rooms[index], currentUser: widget.currentUser),
+                childCount: _rooms.length,
+              ),
             ),
           ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 120)), // مساحة لشريط التنقل
+        const SliverToBoxAdapter(child: SizedBox(height: 120)),
       ],
     );
   }
 }
 
-// اليدجت المساعد للأوربات الضبابية
+// ========================= تبويب الرسائل (معدل ليجلب المستخدمين) =========================
+
+class _MessagesTab extends StatefulWidget {
+  final AppThemeData theme;
+  final AppUser currentUser;
+  const _MessagesTab({required this.theme, required this.currentUser});
+
+  @override
+  State<_MessagesTab> createState() => _MessagesTabState();
+}
+
+class _MessagesTabState extends State<_MessagesTab> {
+  List<AppUser> _users = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsers();
+  }
+
+  Future<void> _fetchUsers() async {
+    try {
+      final users = await DatabaseService.getUsers();
+      // استثناء المستخدم الحالي من القائمة
+      if (mounted) setState(() { 
+        _users = users.where((u) => u.id != widget.currentUser.id).toList(); 
+        _loading = false; 
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('المحادثات', style: TextStyle(color: widget.theme.text, fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Expanded(
+            child: _loading 
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  itemCount: _users.length,
+                  itemBuilder: (context, index) => _GlassUserTile(theme: widget.theme, user: _users[index], currentUser: widget.currentUser),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ========================= الودجت الفرعية المصلحة =========================
+
+class _GlassRoomCard extends StatelessWidget {
+  final AppThemeData theme;
+  final AppRoom room;
+  final AppUser currentUser;
+  const _GlassRoomCard({required this.theme, required this.room, required this.currentUser});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RoomChatScreen(room: room, currentUser: currentUser, theme: theme))),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.white.withOpacity(0.6)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 50, height: 50,
+              decoration: BoxDecoration(color: theme.button.withOpacity(0.1), borderRadius: BorderRadius.circular(15)),
+              child: Center(child: Text(room.icon.isEmpty ? '💬' : room.icon, style: const TextStyle(fontSize: 24))),
+            ),
+            const SizedBox(width: 15),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(room.name, style: TextStyle(color: theme.text, fontWeight: FontWeight.bold)),
+              Text(room.description, style: TextStyle(color: theme.text.withOpacity(0.5), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ])),
+            Icon(Icons.arrow_forward_ios_rounded, size: 14, color: theme.text.withOpacity(0.3)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassUserTile extends StatelessWidget {
+  final AppThemeData theme;
+  final AppUser user;
+  final AppUser currentUser;
+  const _GlassUserTile({required this.theme, required this.user, required this.currentUser});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PrivateChatScreen(otherUserId: user.id, otherUserName: user.fullName, otherUserAvatar: user.avatarUrl, currentUser: currentUser, theme: theme))),
+      leading: CircleAvatar(
+        backgroundColor: theme.accent.withOpacity(0.2), 
+        backgroundImage: user.avatarUrl.isNotEmpty ? NetworkImage(user.avatarUrl) : null,
+        radius: 25,
+        child: user.avatarUrl.isEmpty ? Text(user.fullName[0], style: TextStyle(color: theme.text)) : null,
+      ),
+      title: Text(user.fullName, style: TextStyle(color: theme.text, fontWeight: FontWeight.w600)),
+      subtitle: Text(user.isOnline ? 'متصل الآن' : 'غير متصل', style: TextStyle(color: theme.text.withOpacity(0.5), fontSize: 13)),
+      trailing: Icon(Icons.circle, size: 10, color: user.isOnline ? Colors.green : Colors.transparent),
+    );
+  }
+}
+
 class _BlurOrb extends StatelessWidget {
   final Color color;
   final double size;
@@ -180,80 +325,6 @@ class _BlurOrb extends StatelessWidget {
       width: size, height: size,
       decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40), child: Container(color: Colors.transparent)),
-    );
-  }
-}
-
-// شاشة المحادثات والرسائل (تعديل بسيط للألوان)
-class _MessagesTab extends StatelessWidget {
-  final AppThemeData theme;
-  final AppUser currentUser;
-  const _MessagesTab({required this.theme, required this.currentUser});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('المحادثات', style: TextStyle(color: theme.text, fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          Expanded(
-            child: ListView.builder(
-              itemCount: 3,
-              itemBuilder: (context, index) => _GlassUserTile(theme: theme),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// تصميم البطاقة الزجاجية للغرفة
-class _GlassRoomCard extends StatelessWidget {
-  final AppThemeData theme;
-  const _GlassRoomCard({required this.theme});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.6)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 50, height: 50,
-            decoration: BoxDecoration(color: theme.button.withOpacity(0.1), borderRadius: BorderRadius.circular(15)),
-            child: const Center(child: Text('💬', style: TextStyle(fontSize: 24))),
-          ),
-          const SizedBox(width: 15),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('غرفة عامة', style: TextStyle(color: theme.text, fontWeight: FontWeight.bold)),
-            Text('154 عضواً متصل الآن', style: TextStyle(color: theme.text.withOpacity(0.5), fontSize: 12)),
-          ])),
-          Icon(Icons.arrow_forward_ios_rounded, size: 14, color: theme.text.withOpacity(0.3)),
-        ],
-      ),
-    );
-  }
-}
-
-class _CircularAction extends StatelessWidget {
-  final IconData icon;
-  final AppThemeData theme;
-  const _CircularAction({required this.icon, required this.theme});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.5), shape: BoxShape.circle, border: Border.all(color: Colors.white)),
-      child: Icon(icon, color: theme.text.withOpacity(0.7), size: 22),
     );
   }
 }
@@ -283,17 +354,19 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _GlassUserTile extends StatelessWidget {
+class _CircularAction extends StatelessWidget {
+  final IconData icon;
   final AppThemeData theme;
-  const _GlassUserTile({required this.theme});
+  const _CircularAction({required this.icon, required this.theme});
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(backgroundColor: theme.accent.withOpacity(0.2), radius: 25),
-      title: Text('اسم المستخدم', style: TextStyle(color: theme.text, fontWeight: FontWeight.w600)),
-      subtitle: Text('آخر رسالة تظهر هنا...', style: TextStyle(color: theme.text.withOpacity(0.5), fontSize: 13)),
-      trailing: Icon(Icons.circle, size: 10, color: theme.accent),
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SettingsScreen(currentUser: (context.findAncestorStateOfType<_HomeScreenState>()!).widget.currentUser, theme: theme))),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: Colors.white.withOpacity(0.5), shape: BoxShape.circle, border: Border.all(color: Colors.white)),
+        child: Icon(icon, color: theme.text.withOpacity(0.7), size: 22),
+      ),
     );
   }
 }
