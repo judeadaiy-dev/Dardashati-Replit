@@ -42,17 +42,6 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (AuthService.isLoggedIn) {
-      if (state == AppLifecycleState.resumed) {
-        AuthService.setOnlineStatus(true);
-      } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
-        AuthService.setOnlineStatus(false);
-      }
-    }
-  }
-
   Future<void> _initTheme() async {
     if (AuthService.isLoggedIn) {
       final savedTheme = await DatabaseService.getUserTheme();
@@ -70,10 +59,10 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'تيك شات',
+      title: 'دردشاتي',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar', 'SA'),
-      supportedLocales: const [Locale('ar', 'SA'), Locale('en', 'US')],
+      supportedLocales: const [Locale('ar', 'SA')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -82,25 +71,21 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
       theme: ThemeData(
         fontFamily: _currentTheme.fontFamily,
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _currentTheme.button,
-          brightness: _currentTheme.isDark ? Brightness.dark : Brightness.light,
-        ),
       ),
-      home: _initialized ? _AuthGate(theme: _currentTheme, onThemeChanged: _changeTheme) : _SplashScreen(theme: _currentTheme),
+      home: _initialized 
+          ? _AuthGate(theme: _currentTheme, onThemeChanged: _changeTheme) 
+          : _SplashScreen(theme: _currentTheme),
     );
   }
 }
 
-class _AuthGate extends StatefulWidget {
+// ========================= منطق البوابة والتحميل =========================
+
+class _AuthGate extends StatelessWidget {
   final AppThemeData theme;
   final Function(AppThemeData) onThemeChanged;
   const _AuthGate({required this.theme, required this.onThemeChanged});
-  @override
-  State<_AuthGate> createState() => _AuthGateState();
-}
 
-class _AuthGateState extends State<_AuthGate> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<AuthState>(
@@ -108,9 +93,9 @@ class _AuthGateState extends State<_AuthGate> {
       builder: (context, snapshot) {
         final session = SupabaseService.client.auth.currentSession;
         if (session != null) {
-          return _ProfileLoader(theme: widget.theme, onThemeChanged: widget.onThemeChanged);
+          return _ProfileLoader(theme: theme, onThemeChanged: onThemeChanged);
         }
-        return WelcomeScreen(theme: widget.theme, onThemeChanged: widget.onThemeChanged);
+        return WelcomeScreen(theme: theme, onThemeChanged: onThemeChanged);
       },
     );
   }
@@ -137,7 +122,6 @@ class _ProfileLoaderState extends State<_ProfileLoader> {
   Future<void> _loadProfile() async {
     final profile = await AuthService.getCurrentProfile();
     if (profile != null) {
-      AuthService.setOnlineStatus(true);
       if (mounted) setState(() { _profile = profile; _loading = false; });
     } else {
       final user = SupabaseService.client.auth.currentUser;
@@ -162,12 +146,12 @@ class _ProfileLoaderState extends State<_ProfileLoader> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return _SplashScreen(theme: widget.theme);
-    if (_profile == null) {
-       return WelcomeScreen(theme: widget.theme, onThemeChanged: widget.onThemeChanged);
-    }
+    if (_profile == null) return WelcomeScreen(theme: widget.theme, onThemeChanged: widget.onThemeChanged);
     return HomeScreen(currentUser: _profile!, theme: widget.theme, onThemeChanged: widget.onThemeChanged);
   }
 }
+
+// ========================= الواجهات (UI) =========================
 
 class _SplashScreen extends StatelessWidget {
   final AppThemeData theme;
@@ -175,30 +159,84 @@ class _SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: theme.background,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: theme.button,
-                borderRadius: BorderRadius.circular(32),
-                boxShadow: [BoxShadow(color: theme.button.withOpacity(0.4), blurRadius: 30, spreadRadius: 5)],
+      body: Center(child: CircularProgressIndicator(color: theme.button)),
+    );
+  }
+}
+
+class WelcomeScreen extends StatelessWidget {
+  final AppThemeData theme;
+  final Function(AppThemeData) onThemeChanged;
+  const WelcomeScreen({required this.theme, required this.onThemeChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFE0E7FF), Color(0xFFF8FAFC), Color(0xFFEDE9FE)],
               ),
-              child: Icon(Icons.chat_bubble_outline_rounded, size: 52, color: theme.buttonText),
             ),
-            const SizedBox(height: 24),
-            Text('تيك شات', style: TextStyle(color: theme.text, fontSize: 32, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 32),
-            SizedBox(width: 28, height: 28, child: CircularProgressIndicator(color: theme.button, strokeWidth: 2.5)),
-          ],
-        ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Column(
+                children: [
+                  const Spacer(flex: 3),
+                  Text('دردشاتي', style: TextStyle(color: Color(0xFF1E293B), fontSize: 42, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 12),
+                  Text('تواصل بذكاء وخصوصية تامة', style: TextStyle(color: Color(0xFF64748B), fontSize: 16)),
+                  const Spacer(flex: 4),
+                  _SoftBtn(
+                    label: 'تسجيل الدخول',
+                    isPrimary: true,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LoginScreen(theme: theme, onThemeChanged: onThemeChanged, isLogin: true))),
+                  ),
+                  const SizedBox(height: 16),
+                  _SoftBtn(
+                    label: 'إنشاء حساب جديد',
+                    isPrimary: false,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LoginScreen(theme: theme, onThemeChanged: onThemeChanged, isLogin: false))),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// أضف WelcomeScreen و _Btn هنا كما هما في كودك الأصلي
+class _SoftBtn extends StatelessWidget {
+  final String label;
+  final bool isPrimary;
+  final VoidCallback onTap;
+  const _SoftBtn({required this.label, required this.isPrimary, required this.onTap});
 
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 62,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: isPrimary ? const Color(0xFF6366F1) : Colors.white.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        child: Center(
+          child: Text(label, style: TextStyle(color: isPrimary ? Colors.white : Color(0xFF1E293B), fontSize: 17, fontWeight: FontWeight.bold)),
+        ),
+      ),
+    );
+  }
+}
