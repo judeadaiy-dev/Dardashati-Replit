@@ -31,11 +31,7 @@ jobs:
         run: echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
 
       - name: Clean Project
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew clean
-          cd ..
+        run: flutter clean
 
       - name: Build APK
         run: flutter build apk --release
