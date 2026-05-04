@@ -1,4 +1,3 @@
-import 'app_theme.dart';
 import 'package:flutter/material.dart';
 import 'models.dart';
 import 'app_theme.dart'; 
@@ -17,7 +16,6 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final _broadcastCtrl = TextEditingController();
 
   List<AppUser> _users = [];
   List<AppReport> _reports = [];
@@ -25,7 +23,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   bool _loadingUsers = true;
   bool _loadingReports = true;
   bool _loadingRequests = true;
-  bool _broadcasting = false;
 
   @override
   void initState() {
@@ -37,7 +34,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   @override
   void dispose() {
     _tabController.dispose();
-    _broadcastCtrl.dispose();
     super.dispose();
   }
 
@@ -145,8 +141,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
             ],
           ),
           const SizedBox(height: 20),
-          _broadcastSection(t),
-          const SizedBox(height: 20),
           _latestUsersSection(t),
         ]),
       ),
@@ -175,7 +169,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
 
   Widget _requestsTab(AppThemeData t) {
     if (_loadingRequests) return Center(child: CircularProgressIndicator(color: t.button));
-    // إصلاح خطأ List<dynamic> بإضافة .cast<Widget>()
     return ListView(
       padding: const EdgeInsets.all(16), 
       children: _requests.map((r) => _requestCard(r, t, r.status == 'pending')).toList().cast<Widget>()
@@ -184,7 +177,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
 
   Widget _reportsTab(AppThemeData t) {
     if (_loadingReports) return Center(child: CircularProgressIndicator(color: t.button));
-    // إصلاح خطأ List<dynamic> بإضافة .cast<Widget>()
     return ListView(
       padding: const EdgeInsets.all(16), 
       children: _reports.map((r) => _reportCard(r, t, r.status == 'pending')).toList().cast<Widget>()
@@ -201,30 +193,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
           Text(value, style: TextStyle(color: t.text, fontSize: 24, fontWeight: FontWeight.w900)),
           Text(title, style: TextStyle(color: t.text.withOpacity(0.5), fontSize: 10)),
         ]),
-      ]),
-    );
-  }
-
-  Widget _broadcastSection(AppThemeData t) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(color: Colors.orange.withOpacity(0.08), borderRadius: BorderRadius.circular(20)),
-      child: Column(children: [
-        TextField(
-          controller: _broadcastCtrl, maxLines: 2, textAlign: TextAlign.right,
-          decoration: InputDecoration(hintText: 'بث رسالة لجميع المستخدمين...', border: InputBorder.none, hintStyle: TextStyle(color: t.text.withOpacity(0.5))),
-          style: TextStyle(color: t.text),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            if (_broadcastCtrl.text.isEmpty) return;
-            // التأكد من استدعاء الدالة الصحيحة في DatabaseService
-            await DatabaseService.broadcastMessage(_broadcastCtrl.text);
-            _broadcastCtrl.clear();
-          },
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-          child: const Text('إرسال الآن', style: TextStyle(color: Colors.white)),
-        )
       ]),
     );
   }
