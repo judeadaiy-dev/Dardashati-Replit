@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+Import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -252,12 +252,11 @@ class WelcomeScreen extends StatelessWidget {
                     'محادثات ناعمة كالأمواج',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Color(0xFF2A2750),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      opacity: 0.7,
-                    ),
-                  ),
+  color: const Color(0xFF2A2750).withOpacity(0.7), // دمج الشفافية مع اللون
+  fontSize: 16,
+  fontWeight: FontWeight.w500,
+),
+
 
                   const Spacer(flex: 4),
 
@@ -354,4 +353,3 @@ class _GlassBtn extends StatelessWidget {
     );
   }
 }
-
