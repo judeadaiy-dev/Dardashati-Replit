@@ -1,9 +1,11 @@
-import '../models.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'models.dart';
-import 'services/database_service.dart';
-import 'profile_screen.dart';
+
+// الحل الاحترافي: استخدم المسار الكامل للمشروع دائماً
+import 'package:tik_chat_app/models.dart'; 
+import 'package:tik_chat_app/services/database_service.dart';
+import 'package:tik_chat_app/profile_screen.dart'; // تأكد من المسار الصحيح لهذا الملف أيضاً
+
 
 class PrivateChatScreen extends StatefulWidget {
   final String otherUserId;
