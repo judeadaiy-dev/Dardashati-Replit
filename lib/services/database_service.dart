@@ -107,7 +107,11 @@ class DatabaseService {
       event: PostgresChangeEvent.insert,
       schema: 'public',
       table: 'room_messages',
-      filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'room_id', value: roomId),
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq, 
+        column: 'room_id', 
+        value: roomId
+      ),
       callback: (payload) => onInsert(payload.newRecord),
     ).subscribe();
   }
@@ -148,6 +152,20 @@ class DatabaseService {
     if (_uid == null) return 0;
     final data = await _db.from('notifications').select().eq('user_id', _uid!).eq('is_read', false);
     return (data as List).length;
+  }
+
+  static RealtimeChannel subscribeToNotifications(void Function(AppNotification) onNew) {
+    return _db.channel('notif_$_uid').onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'notifications',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq, 
+        column: 'user_id', 
+        value: _uid ?? ''
+      ),
+      callback: (payload) => onNew(AppNotification.fromMap(payload.newRecord)),
+    ).subscribe();
   }
 
   static Future<void> markAllNotificationsRead() async {
