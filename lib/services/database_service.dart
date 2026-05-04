@@ -80,7 +80,6 @@ class DatabaseService {
     return (data as List).map((m) => AppRoom.fromMap(m)).toList();
   }
 
-  // دالة جلب طلبات الغرف الجديدة للوحة الإدارة
   static Future<List<AppRoomRequest>> getRoomRequests() async {
     final data = await _db.from('room_requests').select().order('created_at', ascending: false);
     return (data as List).map((m) => AppRoomRequest.fromMap(m)).toList();
@@ -91,7 +90,7 @@ class DatabaseService {
     await _db.from('room_members').upsert({'room_id': roomId, 'user_id': _uid!});
   }
 
-  // ==================== الرسائل (Messages) ====================
+  // ==================== الرسائل العامة والخاصة ====================
   static Future<List<AppMessage>> getRoomMessages(String roomId) async {
     final data = await _db.from('room_messages').select('*, sender:profiles(*)').eq('room_id', roomId).order('created_at', ascending: true);
     return (data as List).map((m) => AppMessage.fromMap(m)).toList();
@@ -111,6 +110,36 @@ class DatabaseService {
     ).subscribe();
   }
 
+  // حل أخطاء private_chat_screen
+  static Future<List<AppMessage>> getPrivateMessages(String otherUserId) async {
+    if (_uid == null) return [];
+    final data = await _db
+        .from('private_messages')
+        .select('*, sender:profiles(*)')
+        .or('and(sender_id.eq.$_uid,receiver_id.eq.$otherUserId),and(sender_id.eq.$otherUserId,receiver_id.eq.$_uid)')
+        .order('created_at', ascending: true);
+    return (data as List).map((m) => AppMessage.fromMap(m)).toList();
+  }
+
+  static Future<void> sendPrivateMessage({required String receiverId, required String content, String? replyToId}) async {
+    if (_uid == null) return;
+    await _db.from('private_messages').insert({
+      'sender_id': _uid,
+      'receiver_id': receiverId,
+      'content': content,
+      'reply_to_id': replyToId,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  static Future<void> markPrivateMessagesRead(String otherUserId) async {
+    if (_uid == null) return;
+    await _db.from('private_messages')
+        .update({'is_read': true})
+        .eq('receiver_id', _uid!)
+        .eq('sender_id', otherUserId);
+  }
+
   // ==================== الإشعارات والثيم ====================
   static Future<String> getUserTheme() async {
     const String defaultTheme = 'dardashati_wave';
@@ -126,9 +155,27 @@ class DatabaseService {
     await _db.from('user_settings').upsert({'user_id': _uid!, 'theme_name': themeName});
   }
 
+  // حل أخطاء notifications_screen
+  static Future<List<AppNotification>> getNotifications() async {
+    if (_uid == null) return [];
+    final data = await _db
+        .from('notifications')
+        .select()
+        .eq('user_id', _uid!)
+        .order('created_at', ascending: false);
+    return (data as List).map((m) => AppNotification.fromMap(m)).toList();
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    if (_uid == null) return;
+    await _db.from('notifications').update({'is_read': true}).eq('user_id', _uid!);
+  }
+
+  static Future<void> markNotificationRead(String id) async {
+    await _db.from('notifications').update({'is_read': true}).eq('id', id);
+  }
+
   // ==================== الإدارة والتقارير ====================
-  
-  // دالة جلب كافة البلاغات للوحة الإدارة (تم إصلاح الخطأ هنا)
   static Future<List<AppReport>> getReports() async {
     final data = await _db.from('reports').select().order('created_at', ascending: false);
     return (data as List).map((m) => AppReport.fromMap(m)).toList();
