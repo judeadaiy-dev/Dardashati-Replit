@@ -16,7 +16,7 @@ class AppUser {
   final String? gender;
   final String? bio;
   final bool isBanned;
-  final String role; // 'user', 'admin', 'moderator'
+  final String role; 
   int followersCount;
   int followingCount;
 
@@ -86,11 +86,6 @@ class AppRoom {
       membersCount: map['members_count'] as int? ?? 0,
     );
   }
-
-  String get membersCountLabel {
-    if (membersCount >= 1000) return '${(membersCount / 1000).toStringAsFixed(1)}k عضو';
-    return '$membersCount عضو';
-  }
 }
 
 class AppMessage {
@@ -135,38 +130,35 @@ class AppMessage {
       replyToSender: replySender?['full_name'] as String?,
     );
   }
-
-  String get formattedTime {
-    final h = time.hour > 12 ? time.hour - 12 : (time.hour == 0 ? 12 : time.hour);
-    final m = time.minute.toString().padLeft(2, '0');
-    final p = time.hour >= 12 ? 'م' : 'ص';
-    return '$h:$m $p';
-  }
 }
 
-// ==================== الكلاسات التي تسبب أخطاء البناء (تمت إضافتها) ====================
+// ==================== التعديل المطلوب لحل أخطاء الـ Theme ====================
 
-// حل خطأ: 'AppThemeData' isn't a type
 class AppThemeData {
   final String name;
   final Color primaryColor;
   final List<Color> gradientColors;
   final double borderRadius;
+  
+  // الحقول الجديدة المطلوبة في ملف profile_screen.dart ✅
+  final Color text;   
+  final Color button; 
 
   AppThemeData({
     required this.name,
     required this.primaryColor,
     required this.gradientColors,
+    required this.text,    // تمت إضافتها هنا
+    required this.button,  // تمت إضافتها هنا
     this.borderRadius = 30.0,
   });
 }
 
-// حل خطأ: 'AppRoomRequest' isn't a type
 class AppRoomRequest {
   final String id;
   final String userId;
   final String roomName;
-  final String status; // 'pending', 'approved', 'rejected'
+  final String status; 
   final DateTime createdAt;
 
   AppRoomRequest({
@@ -188,7 +180,6 @@ class AppRoomRequest {
   }
 }
 
-// حل خطأ: 'AppReport' isn't a type
 class AppReport {
   final String id;
   final String reporterId;
@@ -214,3 +205,4 @@ class AppReport {
     );
   }
 }
+
