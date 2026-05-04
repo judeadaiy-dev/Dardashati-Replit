@@ -19,6 +19,22 @@ void main() async {
   await SupabaseService.initialize();
   runApp(TikChatApp());
 }
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(url: '...', anonKey: '...');
+
+  // --- السطر السحري الاحترافي ---
+  // هذا السطر يلتقط أي خطأ يحدث في واجهة المستخدم (UI) أو المنطق (Logic) ويرسله للمراقب
+  FlutterError.onError = (details) => AppLogger.error("GLOBAL", details.exceptionAsString());
+  
+  // وهذا السطر يلتقط الأخطاء التي تحدث في الخلفية (Asynchronous errors) مثل فشل الاتصال بالداتابيز
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLogger.error("DATABASE/AUTH", error.toString());
+    return true;
+  };
+
+  runApp(const MyApp());
+}
 
 class TikChatApp extends StatefulWidget {
   @override
