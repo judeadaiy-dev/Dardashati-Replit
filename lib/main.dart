@@ -12,10 +12,12 @@ import 'login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // تثبيت الاتجاه الرأسي لضمان سلامة الواجهة
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+  // تهيئة سوبابيس
   await SupabaseService.initialize();
   runApp(TikChatApp());
 }
@@ -43,6 +45,7 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
   }
 
   Future<void> _initTheme() async {
+    // التحقق من الثيم المفضل للمستخدم إذا كان مسجلاً للدخول
     if (AuthService.isLoggedIn) {
       final savedTheme = await DatabaseService.getUserTheme();
       final found = AppThemes.allThemes.where((t) => t.name == savedTheme).toList();
@@ -69,9 +72,10 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: ThemeData(
-        fontFamily: _currentTheme.fontFamily,
+        fontFamily: 'Tajawal', // استخدام الخط المتناسق من التصميم
         useMaterial3: true,
       ),
+      // البوابة الأساسية للتطبيق
       home: _initialized 
           ? _AuthGate(theme: _currentTheme, onThemeChanged: _changeTheme) 
           : _SplashScreen(theme: _currentTheme),
@@ -79,7 +83,7 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
   }
 }
 
-// ========================= منطق البوابة والتحميل =========================
+// ========================= منطق البوابة والحماية =========================
 
 class _AuthGate extends StatelessWidget {
   final AppThemeData theme;
@@ -92,9 +96,11 @@ class _AuthGate extends StatelessWidget {
       stream: AuthService.authStateChanges,
       builder: (context, snapshot) {
         final session = SupabaseService.client.auth.currentSession;
+        // إذا وجد جلسة نشطة، ننتقل مباشرة لمحمل الملف الشخصي
         if (session != null) {
           return _ProfileLoader(theme: theme, onThemeChanged: onThemeChanged);
         }
+        // إذا لم يجد جلسة، يظهر شاشة الترحيب الجديدة
         return WelcomeScreen(theme: theme, onThemeChanged: onThemeChanged);
       },
     );
@@ -151,7 +157,7 @@ class _ProfileLoaderState extends State<_ProfileLoader> {
   }
 }
 
-// ========================= الواجهات (UI) =========================
+// ========================= الواجهات الجديدة (Modern UI) =========================
 
 class _SplashScreen extends StatelessWidget {
   final AppThemeData theme;
@@ -159,7 +165,16 @@ class _SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(child: CircularProgressIndicator(color: theme.button)),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFF6F3FF), Color(0xFFEAF8F6)],
+          ),
+        ),
+        child: Center(child: CircularProgressIndicator(color: Color(0xFF7C6BE0))),
+      ),
     );
   }
 }
@@ -174,36 +189,91 @@ class WelcomeScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
+          // خلفية بتدرج ناعم وأوربات (Orbs) ضبابية كما في الـ HTML
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFFE0E7FF), Color(0xFFF8FAFC), Color(0xFFEDE9FE)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFF6F3FF), Color(0xFFEAF8F6)],
               ),
             ),
           ),
+          
+          // الدوائر الضبابية الخلفية
+          Positioned(
+            top: -100,
+            right: -50,
+            child: _BlurOrb(color: const Color(0xFFC9BEFF).withOpacity(0.4), size: 300),
+          ),
+          Positioned(
+            bottom: 50,
+            left: -80,
+            child: _BlurOrb(color: const Color(0xFFA6ECE7).withOpacity(0.4), size: 250),
+          ),
+
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
                   const Spacer(flex: 3),
-                  Text('دردشاتي', style: TextStyle(color: Color(0xFF1E293B), fontSize: 42, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 12),
-                  Text('تواصل بذكاء وخصوصية تامة', style: TextStyle(color: Color(0xFF64748B), fontSize: 16)),
+                  
+                  // شعار دردشاتي بتصميم ناعم
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.4),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                    ),
+                    child: const Icon(Icons.waves_rounded, size: 50, color: Color(0xFF7C6BE0)),
+                  ),
+                  
+                  const SizedBox(height: 30),
+                  
+                  // اسم التطبيق والوصف المحسن
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFF7C6BE0), Color(0xFF3FB8B0)],
+                    ).createShader(bounds),
+                    child: const Text(
+                      'دردشاتي',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 48,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'محادثات ناعمة كالأمواج',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF2A2750),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      opacity: 0.7,
+                    ),
+                  ),
+
                   const Spacer(flex: 4),
-                  _SoftBtn(
+
+                  // الأزرار الزجاجية (Glass Design)
+                  _GlassBtn(
                     label: 'تسجيل الدخول',
                     isPrimary: true,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LoginScreen(theme: theme, onThemeChanged: onThemeChanged, isLogin: true))),
                   ),
                   const SizedBox(height: 16),
-                  _SoftBtn(
+                  _GlassBtn(
                     label: 'إنشاء حساب جديد',
                     isPrimary: false,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LoginScreen(theme: theme, onThemeChanged: onThemeChanged, isLogin: false))),
                   ),
+                  
                   const SizedBox(height: 40),
                 ],
               ),
@@ -215,28 +285,73 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-class _SoftBtn extends StatelessWidget {
+class _BlurOrb extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _BlurOrb({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+      ),
+      child: Container(
+        decoration: const BoxDecoration(shape: BoxShape.circle),
+        clipBehavior: Clip.antiAlias,
+        child: BackdropFilter(
+          filter: const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+          child: Container(),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassBtn extends StatelessWidget {
   final String label;
   final bool isPrimary;
   final VoidCallback onTap;
-  const _SoftBtn({required this.label, required this.isPrimary, required this.onTap});
+
+  const _GlassBtn({required this.label, required this.isPrimary, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 62,
+        height: 60,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: isPrimary ? const Color(0xFF6366F1) : Colors.white.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white, width: 2),
+          gradient: isPrimary ? const LinearGradient(
+            colors: [Color(0xFF7C6BE0), Color(0xFF3FB8B0)],
+          ) : null,
+          color: isPrimary ? null : Colors.white.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.6), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: (isPrimary ? const Color(0xFF7C6BE0) : Colors.black).withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            )
+          ],
         ),
         child: Center(
-          child: Text(label, style: TextStyle(color: isPrimary ? Colors.white : Color(0xFF1E293B), fontSize: 17, fontWeight: FontWeight.bold)),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isPrimary ? Colors.white : const Color(0xFF2A2750),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
       ),
     );
   }
 }
+
