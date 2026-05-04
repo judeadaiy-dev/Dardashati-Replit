@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
 import 'services/database_service.dart';
-// تم حذف import 'mock_data.dart' نهائياً ✅
+import 'app_theme.dart'; // إضافة هذا الـ Import ضرورية جداً لحل أخطاء الـ Build
 import 'profile_screen.dart';
 import 'room_chat_screen.dart';
 
@@ -48,20 +48,19 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
     setState(() => _searching = true);
 
     try {
-      // الاعتماد الكلي على قاعدة البيانات الحقيقية
+      // استخدام الدوال الحقيقية التي أضفناها للسيرفس مؤخراً
       final users = await DatabaseService.searchUsers(trimmedQuery);
       final rooms = await DatabaseService.searchRooms(trimmedQuery);
       
       if (mounted) {
         setState(() {
-          // استثناء المستخدم الحالي من نتائج البحث لضمان تجربة مستخدم أفضل
+          // استثناء المستخدم الحالي من نتائج البحث
           _users = users.where((u) => u.id != widget.currentUser.id).toList();
           _rooms = rooms;
           _searching = false;
         });
       }
     } catch (e) {
-      // في حالة الخطأ، نكتفي بعرض قائمة فارغة بدل استخدام بيانات وهمية تسبب تضارب
       if (mounted) {
         setState(() {
           _users = [];
@@ -79,7 +78,10 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
       child: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-          child: Text('البحث', style: TextStyle(color: t.text, fontSize: 26, fontWeight: FontWeight.w900)),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Text('البحث', style: TextStyle(color: t.text, fontSize: 26, fontWeight: FontWeight.w900))
+          ),
         ),
 
         Padding(
@@ -87,14 +89,15 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.4), // تصميم زجاجي متوافق مع HomeScreen
+              color: Colors.white.withOpacity(0.4),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.white.withOpacity(0.6)),
             ),
             child: Row(children: [
-              _searching
-                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.button))
-                  : Icon(Icons.search, color: t.text.withOpacity(0.4), size: 22),
+              if (_searching)
+                SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.button))
+              else
+                Icon(Icons.search, color: t.text.withOpacity(0.4), size: 22),
               const SizedBox(width: 10),
               Expanded(child: TextField(
                 controller: _ctrl,
@@ -158,13 +161,13 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
         final u = _users[i];
         return ListTile(
           onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => ProfileScreen(userId: u.id, currentUserId: widget.currentUser.id, theme: t))),
-          leading: CircleAvatar(
+          trailing: CircleAvatar( // نقل الصورة لليمين ليتناسب مع RTL
             backgroundImage: u.avatarUrl.isNotEmpty ? NetworkImage(u.avatarUrl) : null,
             child: u.avatarUrl.isEmpty ? Text(u.fullName[0]) : null,
           ),
-          title: Text(u.fullName, style: TextStyle(color: t.text, fontWeight: FontWeight.bold)),
-          subtitle: Text(u.isOnline ? 'متصل' : 'غير متصل', style: TextStyle(color: u.isOnline ? Colors.green : t.text.withOpacity(0.4))),
-          trailing: Icon(Icons.arrow_forward_ios, size: 14, color: t.text.withOpacity(0.3)),
+          title: Text(u.fullName, textAlign: TextAlign.right, style: TextStyle(color: t.text, fontWeight: FontWeight.bold)),
+          subtitle: Text(u.isOnline ? 'متصل' : 'غير متصل', textAlign: TextAlign.right, style: TextStyle(color: u.isOnline ? Colors.green : t.text.withOpacity(0.4))),
+          leading: Icon(Icons.arrow_back_ios, size: 14, color: t.text.withOpacity(0.3)),
         );
       },
     );
@@ -180,14 +183,14 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
         final r = _rooms[i];
         return ListTile(
           onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => RoomChatScreen(room: r, currentUser: widget.currentUser, theme: t))),
-          leading: Container(
+          trailing: Container(
             width: 40, height: 40,
             decoration: BoxDecoration(color: t.button.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
             child: Center(child: Text(r.icon.isEmpty ? '💬' : r.icon)),
           ),
-          title: Text(r.name, style: TextStyle(color: t.text, fontWeight: FontWeight.bold)),
-          subtitle: Text(r.description, maxLines: 1, overflow: TextOverflow.ellipsis),
-          trailing: Icon(Icons.arrow_forward_ios, size: 14, color: t.text.withOpacity(0.3)),
+          title: Text(r.name, textAlign: TextAlign.right, style: TextStyle(color: t.text, fontWeight: FontWeight.bold)),
+          subtitle: Text(r.description, textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: t.text.withOpacity(0.6))),
+          leading: Icon(Icons.arrow_back_ios, size: 14, color: t.text.withOpacity(0.3)),
         );
       },
     );
