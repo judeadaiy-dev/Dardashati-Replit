@@ -86,15 +86,22 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // الخلفية الناعمة
+          // خلفية متدرجة (نفس تيم شاشة الترحيب)
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFFE0E7FF), Color(0xFFF8FAFC), Color(0xFFEDE9FE)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFF6F3FF), Color(0xFFEAF8F6)],
               ),
             ),
+          ),
+
+          // الأوربات (Orbs) الضبابية للخلفية
+          Positioned(
+            top: -50,
+            left: -50,
+            child: _BlurOrb(color: const Color(0xFFC9BEFF).withOpacity(0.3), size: 200),
           ),
           
           SafeArea(
@@ -103,76 +110,116 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
+                  // زر الرجوع بتصميم ناعم
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B)),
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF7C6BE0), size: 20),
+                    ),
                   ),
+                  
                   const SizedBox(height: 20),
                   
+                  // العناوين بتصميم عصري
                   Text(
-                    _isLogin ? 'أهلاً بعودتك' : 'انضم إلينا',
-                    style: const TextStyle(color: Color(0xFF1E293B), fontSize: 34, fontWeight: FontWeight.w900),
+                    _isLogin ? 'مرحباً بك مجدداً' : 'انضم لأسرتنا',
+                    style: const TextStyle(
+                      color: Color(0xFF2A2750),
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _isLogin ? 'سجل دخولك للمتابعة' : 'أنشئ حسابك الجديد بلمسة واحدة',
-                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 16),
+                    _isLogin ? 'سجل دخولك لمتابعة محادثاتك' : 'ابدأ تجربتك الفريدة في دردشاتي',
+                    style: TextStyle(color: const Color(0xFF2A2750).withOpacity(0.6), fontSize: 15, fontWeight: FontWeight.w500),
                   ),
                   
                   const SizedBox(height: 35),
 
-                  // رسالة الخطأ إن وجدت
+                  // رسالة الخطأ بتصميم زجاجي محذر
                   if (_error != null) ...[
                     Container(
                       padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(color: Colors.red.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.red.withOpacity(0.2))),
-                      child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 14)),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.red.withOpacity(0.1)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold))),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 20),
                   ],
 
-                  // الحقول
+                  // حقول الإدخال بتصميم Glassmorphism المحسن
                   if (!_isLogin) ...[
-                    _buildField(label: 'الاسم الكامل', icon: Icons.person_outline, controller: _name),
+                    _buildField(label: 'الاسم الكامل', icon: Icons.person_outline_rounded, controller: _name),
                     const SizedBox(height: 16),
                   ],
-                  _buildField(label: 'البريد الإلكتروني', icon: Icons.email_outlined, controller: _email, keyboardType: TextInputType.emailAddress),
+                  _buildField(label: 'البريد الإلكتروني', icon: Icons.alternate_email_rounded, controller: _email, keyboardType: TextInputType.emailAddress),
                   const SizedBox(height: 16),
-                  _buildField(label: 'كلمة المرور', icon: Icons.lock_outline, controller: _password, isPassword: true),
+                  _buildField(label: 'كلمة المرور', icon: Icons.lock_open_rounded, controller: _password, isPassword: true),
                   
                   const SizedBox(height: 40),
                   
-                  // زر الدخول / التسجيل
+                  // زر الإجراء الرئيسي المتدرج
                   GestureDetector(
                     onTap: _submit,
                     child: Container(
                       height: 62,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6366F1),
-                        borderRadius: BorderRadius.circular(22),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF7C6BE0), Color(0xFF3FB8B0)],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
                         boxShadow: [
-                          BoxShadow(color: const Color(0xFF6366F1).withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))
+                          BoxShadow(
+                            color: const Color(0xFF7C6BE0).withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          )
                         ],
                       ),
                       child: Center(
                         child: _loading 
-                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                          : Text(_isLogin ? 'دخول' : 'بدء الرحلة', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                          : Text(
+                              _isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد',
+                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
                       ),
                     ),
                   ),
                   
                   const SizedBox(height: 25),
                   
-                  // التبديل بين الدخول والتسجيل
+                  // التبديل بين الحالات
                   Center(
                     child: TextButton(
                       onPressed: () => setState(() => _isLogin = !_isLogin),
-                      child: Text(
-                        _isLogin ? 'ليس لديك حساب؟ سجل الآن' : 'لديك حساب بالفعل؟ ادخل',
-                        style: const TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.w600),
+                      style: TextButton.styleFrom(foregroundColor: const Color(0xFF7C6BE0)),
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(fontFamily: 'Tajawal', fontSize: 14),
+                          children: [
+                            TextSpan(text: _isLogin ? 'ليس لديك حساب؟ ' : 'لديك حساب بالفعل؟ ', style: const TextStyle(color: Color(0xFF2A2750))),
+                            TextSpan(text: _isLogin ? 'سجل الآن' : 'ادخل من هنا', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF3FB8B0))),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -188,22 +235,22 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildField({required String label, required IconData icon, required TextEditingController controller, bool isPassword = false, TextInputType? keyboardType}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white, width: 2),
+        color: Colors.white.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.6), width: 1.5),
       ),
       child: TextField(
         controller: controller,
         obscureText: isPassword && _obscure,
         keyboardType: keyboardType,
         textAlign: TextAlign.right,
-        style: const TextStyle(color: Color(0xFF1E293B)),
+        style: const TextStyle(color: Color(0xFF2A2750), fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           hintText: label,
-          hintStyle: TextStyle(color: const Color(0xFF64748B).withOpacity(0.5)),
-          prefixIcon: Icon(icon, color: const Color(0xFF6366F1), size: 22),
+          hintStyle: TextStyle(color: const Color(0xFF2A2750).withOpacity(0.4), fontSize: 14),
+          prefixIcon: Icon(icon, color: const Color(0xFF7C6BE0), size: 22),
           suffixIcon: isPassword ? IconButton(
-            icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: const Color(0xFF64748B).withOpacity(0.5)),
+            icon: Icon(_obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: const Color(0xFF2A2750).withOpacity(0.3), size: 20),
             onPressed: () => setState(() => _obscure = !_obscure),
           ) : null,
           border: InputBorder.none,
@@ -213,3 +260,24 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
+// ويدجت مساعدة للأوربات الضبابية
+class _BlurOrb extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _BlurOrb({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [BoxShadow(color: color, blurRadius: 40, spreadRadius: 20)],
+      ),
+    );
+  }
+}
+
