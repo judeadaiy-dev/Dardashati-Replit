@@ -5,9 +5,7 @@ import '../models.dart';
 class AuthService {
   static final _client = SupabaseService.client;
 
-  // --- الإضافة المطلوبة هنا ---
   static String? get currentUserId => _client.auth.currentUser?.id;
-  // ---------------------------
 
   // تسجيل الدخول بالبريد وكلمة المرور
   static Future<AuthResponse> signIn({
@@ -39,27 +37,38 @@ class AuthService {
     await _client.auth.signOut();
   }
 
-  // الجلسة الحالية
   static Session? get currentSession => _client.auth.currentSession;
   static User? get currentUser => _client.auth.currentUser;
   static bool get isLoggedIn => currentUser != null;
 
-  // الاستماع لتغييرات المصادقة
   static Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
 
-  // جلب الملف الشخصي للمستخدم الحالي
+  // جلب الملف الشخصي للمستخدم الحالي - تم تحديثه ليتوافق مع المودل الجديد ✅
   static Future<AppUser?> getCurrentProfile() async {
-    final uid = currentUserId; // استخدمنا المتغير الجديد هنا للتبسيط
-    if (uid == null) return null;
+    final user = currentUser;
+    if (user == null) return null;
     try {
       final data = await _client
           .from('profiles')
           .select()
-          .eq('id', uid)
+          .eq('id', user.id)
           .single();
-      return AppUser.fromMap(data);
+      
+      // نقوم بدمج الإيميل من بيانات الـ Auth لضمان عدم وجود قيمة فارغة
+      final Map<String, dynamic> profileData = Map<String, dynamic>.from(data);
+      if (profileData['email'] == null || profileData['email'].toString().isEmpty) {
+        profileData['email'] = user.email;
+      }
+      
+      return AppUser.fromMap(profileData);
     } catch (_) {
-      return null;
+      // في حال لم يتم العثور على بروفايل بعد، ننشئ كائن مؤقت من بيانات التسجيل
+      return AppUser(
+        id: user.id,
+        fullName: user.userMetadata?['full_name'] ?? 'مستخدم',
+        email: user.email ?? '',
+        avatarUrl: '',
+      );
     }
   }
 
@@ -70,17 +79,18 @@ class AuthService {
     try {
       await _client
           .from('profiles')
-          .update({'is_online': isOnline, 'last_seen': DateTime.now().toIso8601String()})
+          .update({
+            'is_online': isOnline, 
+            'last_seen': DateTime.now().toIso8601String()
+          })
           .eq('id', uid);
     } catch (_) {}
   }
 
-  // تغيير كلمة المرور
   static Future<void> updatePassword(String newPassword) async {
     await _client.auth.updateUser(UserAttributes(password: newPassword));
   }
 
-  // إعادة تعيين كلمة المرور عبر البريد
   static Future<void> resetPassword(String email) async {
     await _client.auth.resetPasswordForEmail(email.trim());
   }
