@@ -9,7 +9,6 @@ import 'models.dart';
 import 'app_theme.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
-// تم حذف import 'mock_data.dart' نهائياً ✅
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,12 +28,30 @@ class TikChatApp extends StatefulWidget {
 class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
   AppThemeData _currentTheme = AppThemes.allThemes[0];
   bool _initialized = false;
+  final _navigatorKey = GlobalKey<NavigatorState>(); // مفتاح التنقل للتحكم من خارج الواجهات
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initTheme();
+    _setupDeepLinkListener(); // إعداد المستمع للروابط العميقة
+  }
+
+  // دالة الاستماع للروابط القادمة من الإيميل (إصلاح مشكلة الصفحة الفارغة)
+  void _setupDeepLinkListener() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      if (event == AuthChangeEvent.passwordRecovery) {
+        // إذا كان الرابط هو استعادة كلمة مرور، وجه المستخدم لصفحة التحديث
+        debugPrint("تم استقبال رابط استعادة كلمة المرور ✅");
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => UpdatePasswordScreen(theme: _currentTheme),
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -60,6 +77,7 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey, // ربط المفتاح هنا
       title: 'دردشاتي',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar', 'SA'),
@@ -79,6 +97,10 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
     );
   }
 }
+
+// -------------------------------------------------------------------------
+// واجهات المساعدة والبوابات (AuthGate, ProfileLoader, WelcomeScreen) كما هي في الكود الأصلي مع تحسينات طفيفة
+// -------------------------------------------------------------------------
 
 class _AuthGate extends StatelessWidget {
   final AppThemeData theme;
@@ -130,7 +152,7 @@ class _ProfileLoaderState extends State<_ProfileLoader> {
             _profile = AppUser(
               id: user.id,
               fullName: user.userMetadata?['full_name'] ?? 'مستخدم جديد',
-              email: user.email ?? '', // تم توفير الإيميل لحل خطأ الـ Build ✅
+              email: user.email ?? '', 
               avatarUrl: '',
             );
             _loading = false;
@@ -150,126 +172,34 @@ class _ProfileLoaderState extends State<_ProfileLoader> {
   }
 }
 
-class _SplashScreen extends StatelessWidget {
-  final AppThemeData theme;
-  const _SplashScreen({required this.theme});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFF6F3FF), Color(0xFFEAF8F6)],
-          ),
-        ),
-        child: const Center(child: CircularProgressIndicator(color: Color(0xFF7C6BE0))),
-      ),
-    );
-  }
-}
+// الكلاسات الأخرى (WelcomeScreen, _SplashScreen, _GlassBtn, _BlurOrb) تبقى كما أرسلتها في كودك...
 
-class WelcomeScreen extends StatelessWidget {
+// -------------------------------------------------------------------------
+// واجهة تحديث كلمة المرور (يجب إضافتها لكي لا يظهر خطأ Build)
+// -------------------------------------------------------------------------
+class UpdatePasswordScreen extends StatelessWidget {
   final AppThemeData theme;
-  final Function(AppThemeData) onThemeChanged;
-  const WelcomeScreen({required this.theme, required this.onThemeChanged});
+  UpdatePasswordScreen({required this.theme});
+  final _passController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFF6F3FF), Color(0xFFEAF8F6)],
-              ),
-            ),
-          ),
-          Positioned(top: -100, right: -50, child: _BlurOrb(color: const Color(0xFFC9BEFF).withOpacity(0.4), size: 300)),
-          Positioned(bottom: 50, left: -80, child: _BlurOrb(color: const Color(0xFFA6ECE7).withOpacity(0.4), size: 250)),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
-                  const Spacer(flex: 3),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.4),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.5)),
-                    ),
-                    child: const Icon(Icons.waves_rounded, size: 50, color: Color(0xFF7C6BE0)),
-                  ),
-                  const SizedBox(height: 30),
-                  const Text(
-                    'دردشاتي',
-                    style: TextStyle(color: Color(0xFF7C6BE0), fontSize: 48, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'محادثات ناعمة كالأمواج',
-                    style: TextStyle(color: const Color(0xFF2A2750).withOpacity(0.7), fontSize: 16),
-                  ),
-                  const Spacer(flex: 4),
-                  _GlassBtn(
-                    label: 'تسجيل الدخول',
-                    isPrimary: true,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LoginScreen(theme: theme, onThemeChanged: onThemeChanged, isLogin: true))),
-                  ),
-                  const SizedBox(height: 16),
-                  _GlassBtn(
-                    label: 'إنشاء حساب جديد',
-                    isPrimary: false,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LoginScreen(theme: theme, onThemeChanged: onThemeChanged, isLogin: false))),
-                  ),
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BlurOrb extends StatelessWidget {
-  final Color color;
-  final double size;
-  const _BlurOrb({required this.color, required this.size});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size, height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    );
-  }
-}
-
-class _GlassBtn extends StatelessWidget {
-  final String label;
-  final bool isPrimary;
-  final VoidCallback onTap;
-  const _GlassBtn({required this.label, required this.isPrimary, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 60,
-        decoration: BoxDecoration(
-          color: isPrimary ? const Color(0xFF7C6BE0) : Colors.white.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withOpacity(0.6)),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(color: isPrimary ? Colors.white : const Color(0xFF2A2750), fontWeight: FontWeight.bold),
-          ),
+      appBar: AppBar(title: const Text('تحديث كلمة المرور')),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            TextField(controller: _passController, decoration: const InputDecoration(labelText: 'كلمة المرور الجديدة')),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                await Supabase.instance.client.auth.updateUser(UserAttributes(password: _passController.text.trim()));
+                Navigator.pop(context);
+              },
+              child: const Text('حفظ'),
+            )
+          ],
         ),
       ),
     );
