@@ -6,6 +6,27 @@ enum FilterType { all, online, banned, pending }
 
 // ==================== Models ====================
 
+// --- كلاس الرسائل (تمت إضافته لحل أخطاء شاشة الدردشة) ---
+class AppMessage {
+  final String id;
+  final String senderId;
+  final String senderName;
+  final String? senderAvatar;
+  final String content;
+  final DateTime time;
+  final bool isMe;
+
+  AppMessage({
+    required this.id,
+    required this.senderId,
+    required this.senderName,
+    this.senderAvatar,
+    required this.content,
+    required this.time,
+    this.isMe = false,
+  });
+}
+
 class AppUser {
   final String id;
   final String fullName;
@@ -88,7 +109,6 @@ class AppRoom {
   }
 }
 
-// --- تحديث كلاس الثيم لحل كافة أخطاء الشاشات ---
 class AppThemeData {
   final String name;
   final String label;
@@ -98,10 +118,10 @@ class AppThemeData {
   final Color text;   
   final Color button; 
   final Color card;
-  final Color accent;      // حقل مطلوب لشاشة الإعدادات
-  final Color menu;        // حقل مطلوب لـ BottomSheets
-  final Color buttonText;  // حقل مطلوب للنصوص فوق الأزرار
-  final bool isDark;       // حقل مطلوب لمعرفة حالة الثيم
+  final Color accent;      
+  final Color menu;        
+  final Color buttonText;  
+  final bool isDark;       
   final double borderRadius;
 
   AppThemeData({
@@ -121,13 +141,13 @@ class AppThemeData {
   });
 }
 
-// --- إضافة كلاس الإشعارات المفقود ---
+// --- تعديل كلاس الإشعارات (إزالة final عن isRead) ---
 class AppNotification {
   final String id;
   final String title;
   final String body;
   final IconData icon;
-  final bool isRead;
+  bool isRead; // تمت إزالة final لتتمكن من تعديلها في شاشة الإشعارات
   final DateTime createdAt;
 
   AppNotification({
@@ -175,7 +195,7 @@ class AppReport {
   final String reporterId;
   final String reportedId;
   final String reason;
-  final String status; // أضفنا هذا الحقل لحل خطأ لوحة الإدارة
+  final String status; 
   final DateTime timestamp;
   final String? targetName;
 
@@ -201,4 +221,3 @@ class AppReport {
     );
   }
 }
-
