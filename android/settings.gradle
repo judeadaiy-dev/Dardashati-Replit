@@ -1,7 +1,3 @@
-// ... الكود الذي أرسلته لي سابقاً يبقى كما هو ...
-
-// أضف هذا السطر في آخر الملف تماماً إذا لم يكن موجوداً
-apply from: "${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle/app_plugin_loader.gradle"
 pluginManagement {
     def flutterSdkPath = {
         def properties = new Properties()
@@ -25,3 +21,13 @@ plugins {
 }
 
 include ":app"
+
+def flutterSdkPath = {
+    def properties = new Properties()
+    file("local.properties").withInputStream { properties.load(it) }
+    def path = properties.getProperty("flutter.sdk")
+    assert path != null, "flutter.sdk not set in local.properties"
+    return path
+}()
+
+apply from: "${flutterSdkPath}/packages/flutter_tools/gradle/app_plugin_loader.gradle"
