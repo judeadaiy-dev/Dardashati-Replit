@@ -5,6 +5,10 @@ import '../models.dart';
 class AuthService {
   static final _client = SupabaseService.client;
 
+  // --- الإضافة المطلوبة هنا ---
+  static String? get currentUserId => _client.auth.currentUser?.id;
+  // ---------------------------
+
   // تسجيل الدخول بالبريد وكلمة المرور
   static Future<AuthResponse> signIn({
     required String email,
@@ -35,7 +39,7 @@ class AuthService {
     await _client.auth.signOut();
   }
 
-  // الجلسة الحالية (تحفظ تلقائياً)
+  // الجلسة الحالية
   static Session? get currentSession => _client.auth.currentSession;
   static User? get currentUser => _client.auth.currentUser;
   static bool get isLoggedIn => currentUser != null;
@@ -45,7 +49,7 @@ class AuthService {
 
   // جلب الملف الشخصي للمستخدم الحالي
   static Future<AppUser?> getCurrentProfile() async {
-    final uid = currentUser?.id;
+    final uid = currentUserId; // استخدمنا المتغير الجديد هنا للتبسيط
     if (uid == null) return null;
     try {
       final data = await _client
@@ -61,7 +65,7 @@ class AuthService {
 
   // تحديث الحضور (online/offline)
   static Future<void> setOnlineStatus(bool isOnline) async {
-    final uid = currentUser?.id;
+    final uid = currentUserId;
     if (uid == null) return;
     try {
       await _client
