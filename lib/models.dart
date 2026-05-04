@@ -9,7 +9,7 @@ enum FilterType { all, online, banned, pending }
 class AppUser {
   final String id;
   final String fullName;
-  final String email; // تم إضافة الحقل المفقود هنا ✅
+  final String email; 
   final String avatarUrl;
   final bool isOnline;
   final String? zodiac;
@@ -23,7 +23,7 @@ class AppUser {
   AppUser({
     required this.id,
     required this.fullName,
-    required this.email, // تم إضافته للـ constructor
+    required this.email,
     required this.avatarUrl,
     this.isOnline = false,
     this.zodiac,
@@ -39,7 +39,7 @@ class AppUser {
     return AppUser(
       id: map['id'] as String,
       fullName: map['full_name'] as String? ?? '',
-      email: map['email'] as String? ?? '', // معالجة جلب الإيميل من قاعدة البيانات
+      email: map['email'] as String? ?? '', 
       avatarUrl: map['avatar_url'] as String? ?? '',
       isOnline: map['is_online'] as bool? ?? false,
       zodiac: map['zodiac'] as String?,
@@ -144,5 +144,73 @@ class AppMessage {
   }
 }
 
-// بقية الكلاسات (AppRoomRequest, AppReport, AppNotification, AppThemeData) تبقى كما هي دون تغييرات ضرورية حالياً.
-// ... (كما أرسلتها في رسالتك السابقة)
+// ==================== الكلاسات التي تسبب أخطاء البناء (تمت إضافتها) ====================
+
+// حل خطأ: 'AppThemeData' isn't a type
+class AppThemeData {
+  final String name;
+  final Color primaryColor;
+  final List<Color> gradientColors;
+  final double borderRadius;
+
+  AppThemeData({
+    required this.name,
+    required this.primaryColor,
+    required this.gradientColors,
+    this.borderRadius = 30.0,
+  });
+}
+
+// حل خطأ: 'AppRoomRequest' isn't a type
+class AppRoomRequest {
+  final String id;
+  final String userId;
+  final String roomName;
+  final String status; // 'pending', 'approved', 'rejected'
+  final DateTime createdAt;
+
+  AppRoomRequest({
+    required this.id,
+    required this.userId,
+    required this.roomName,
+    required this.status,
+    required this.createdAt,
+  });
+
+  factory AppRoomRequest.fromMap(Map<String, dynamic> map) {
+    return AppRoomRequest(
+      id: map['id'] as String,
+      userId: map['user_id'] as String? ?? '',
+      roomName: map['room_name'] as String? ?? '',
+      status: map['status'] as String? ?? 'pending',
+      createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
+    );
+  }
+}
+
+// حل خطأ: 'AppReport' isn't a type
+class AppReport {
+  final String id;
+  final String reporterId;
+  final String reportedId;
+  final String reason;
+  final DateTime timestamp;
+
+  AppReport({
+    required this.id,
+    required this.reporterId,
+    required this.reportedId,
+    required this.reason,
+    required this.timestamp,
+  });
+
+  factory AppReport.fromMap(Map<String, dynamic> map) {
+    return AppReport(
+      id: map['id'] as String,
+      reporterId: map['reporter_id'] as String? ?? '',
+      reportedId: map['reported_id'] as String? ?? '',
+      reason: map['reason'] as String? ?? '',
+      timestamp: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
+    );
+  }
+}
