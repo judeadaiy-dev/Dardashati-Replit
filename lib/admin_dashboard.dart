@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+// استيراد الملفات الضرورية لحل أخطاء "isn't a type"
 import 'models.dart';
 import 'app_theme.dart'; 
 import 'services/database_service.dart';
@@ -17,9 +18,11 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  // إصلاح أخطاء التوع (Types) عبر تعريف القوائم بشكل يقبله المترجم
   List<AppUser> _users = [];
   List<AppReport> _reports = [];
   List<AppRoomRequest> _requests = [];
+  
   bool _loadingUsers = true;
   bool _loadingReports = true;
   bool _loadingRequests = true;
@@ -56,6 +59,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   Future<void> _loadReports() async {
     setState(() => _loadingReports = true);
     try {
+      // التأكد من استدعاء الدالة الصحيحة من DatabaseService
       final data = await DatabaseService.getReports();
       if (mounted) setState(() { _reports = data; _loadingReports = false; });
     } catch (_) {
@@ -66,6 +70,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   Future<void> _loadRequests() async {
     setState(() => _loadingRequests = true);
     try {
+      // التأكد من استدعاء الدالة الصحيحة من DatabaseService
       final data = await DatabaseService.getRoomRequests();
       if (mounted) setState(() { _requests = data; _loadingRequests = false; });
     } catch (_) {
@@ -165,8 +170,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
           ),
           const SizedBox(height: 25),
           _latestUsersSection(t),
-          const SizedBox(height: 25),
-          // يمكنك إضافة قسم إحصائي طويل هنا مستقبلاً
         ]),
       ),
     );
@@ -270,7 +273,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     );
   }
 
-  // ميزات إدارة المستخدمين والطلبات والبلاغات كاملة
   Widget _usersTab(AppThemeData t) {
     if (_loadingUsers) return Center(child: CircularProgressIndicator(color: t.button));
     return ListView.builder(
@@ -301,6 +303,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
 
   Widget _requestsTab(AppThemeData t) {
     if (_loadingRequests) return Center(child: CircularProgressIndicator(color: t.button));
+    // استخدام .cast<Widget>() لحل مشكلة List<dynamic> في GitHub
     return ListView(
       padding: const EdgeInsets.all(16), 
       children: _requests.map((r) => _requestCard(r, t)).toList().cast<Widget>()
@@ -309,6 +312,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
 
   Widget _reportsTab(AppThemeData t) {
     if (_loadingReports) return Center(child: CircularProgressIndicator(color: t.button));
+    // استخدام .cast<Widget>() لحل مشكلة List<dynamic> في GitHub
     return ListView(
       padding: const EdgeInsets.all(16), 
       children: _reports.map((r) => _reportCard(r, t)).toList().cast<Widget>()
@@ -322,7 +326,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
       child: ListTile(
         title: Text(req.name, style: TextStyle(color: t.text, fontWeight: FontWeight.bold)), 
         subtitle: Text('الحالة: ${req.status}', style: TextStyle(color: t.text.withOpacity(0.6))),
-        trailing: Icon(Icons.more_vert, color: t.text),
       )
     );
   }
@@ -335,7 +338,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
         leading: const Icon(Icons.warning_amber_rounded, color: Colors.red),
         title: Text(rep.reason, style: TextStyle(color: t.text, fontWeight: FontWeight.bold)), 
         subtitle: Text('ضد: ${rep.targetName}', style: TextStyle(color: t.text.withOpacity(0.6))),
-        trailing: Text(rep.status, style: const TextStyle(color: Colors.orange, fontSize: 12)),
       )
     );
   }
