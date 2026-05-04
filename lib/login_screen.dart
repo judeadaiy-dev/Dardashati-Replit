@@ -30,6 +30,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
 
+  // الحصول على نسخة Supabase لاستخدامها في إعادة التعيين
+  final SupabaseClient supabase = Supabase.instance.client;
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +43,36 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _name.dispose(); _email.dispose(); _password.dispose();
     super.dispose();
+  }
+
+  // دالة إعادة تعيين كلمة المرور (المضافة والمصلحة)
+  Future<void> _resetPassword() async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'يرجى كتابة بريدك الإلكتروني أولاً في الحقل أعلاه');
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      await supabase.auth.resetPasswordForEmail(
+        email,
+        // الرابط الذي تم ضبطه في Supabase و AndroidManifest
+        redirectTo: 'dardashati://callback', 
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني', textAlign: TextAlign.right),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _error = 'فشل إرسال الرابط، تأكد من صحة البريد');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -86,7 +119,6 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // خلفية متدرجة (نفس تيم شاشة الترحيب)
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -96,14 +128,11 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-
-          // الأوربات (Orbs) الضبابية للخلفية
           Positioned(
             top: -50,
             left: -50,
             child: _BlurOrb(color: const Color(0xFFC9BEFF).withOpacity(0.3), size: 200),
           ),
-          
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -111,40 +140,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 10),
-                  // زر الرجوع بتصميم ناعم
                   IconButton(
                     onPressed: () => Navigator.pop(context),
                     icon: Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.5),
-                        shape: BoxShape.circle,
-                      ),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.5), shape: BoxShape.circle),
                       child: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF7C6BE0), size: 20),
                     ),
                   ),
-                  
                   const SizedBox(height: 20),
-                  
-                  // العناوين بتصميم عصري
                   Text(
                     _isLogin ? 'مرحباً بك مجدداً' : 'انضم لأسرتنا',
-                    style: const TextStyle(
-                      color: Color(0xFF2A2750),
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
+                    style: const TextStyle(color: Color(0xFF2A2750), fontSize: 32, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _isLogin ? 'سجل دخولك لمتابعة محادثاتك' : 'ابدأ تجربتك الفريدة في دردشاتي',
                     style: TextStyle(color: const Color(0xFF2A2750).withOpacity(0.6), fontSize: 15, fontWeight: FontWeight.w500),
                   ),
-                  
                   const SizedBox(height: 35),
 
-                  // رسالة الخطأ بتصميم زجاجي محذر
                   if (_error != null) ...[
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -164,7 +179,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 20),
                   ],
 
-                  // حقول الإدخال بتصميم Glassmorphism المحسن
                   if (!_isLogin) ...[
                     _buildField(label: 'الاسم الكامل', icon: Icons.person_outline_rounded, controller: _name),
                     const SizedBox(height: 16),
@@ -173,45 +187,39 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   _buildField(label: 'كلمة المرور', icon: Icons.lock_open_rounded, controller: _password, isPassword: true),
                   
-                  const SizedBox(height: 40),
+                  // زر "نسيت كلمة المرور" المضاف حديثاً
+                  if (_isLogin) 
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: _resetPassword,
+                        child: const Text('نسيت كلمة المرور؟', style: TextStyle(color: Color(0xFF7C6BE0), fontSize: 13, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+
+                  const SizedBox(height: 30),
                   
-                  // زر الإجراء الرئيسي المتدرج
                   GestureDetector(
                     onTap: _submit,
                     child: Container(
                       height: 62,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF7C6BE0), Color(0xFF3FB8B0)],
-                        ),
+                        gradient: const LinearGradient(colors: [Color(0xFF7C6BE0), Color(0xFF3FB8B0)]),
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF7C6BE0).withOpacity(0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          )
-                        ],
+                        boxShadow: [BoxShadow(color: const Color(0xFF7C6BE0).withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
                       ),
                       child: Center(
                         child: _loading 
                           ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                          : Text(
-                              _isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد',
-                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
-                            ),
+                          : Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ),
-                  
                   const SizedBox(height: 25),
-                  
-                  // التبديل بين الحالات
                   Center(
                     child: TextButton(
                       onPressed: () => setState(() => _isLogin = !_isLogin),
-                      style: TextButton.styleFrom(foregroundColor: const Color(0xFF7C6BE0)),
                       child: RichText(
                         text: TextSpan(
                           style: const TextStyle(fontFamily: 'Tajawal', fontSize: 14),
@@ -261,7 +269,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ويدجت مساعدة للأوربات الضبابية
 class _BlurOrb extends StatelessWidget {
   final Color color;
   final double size;
@@ -280,4 +287,3 @@ class _BlurOrb extends StatelessWidget {
     );
   }
 }
-
