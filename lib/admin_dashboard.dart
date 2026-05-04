@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
-import 'app_theme.dart'; // إصلاح خطأ AppThemeData ✅
+import 'app_theme.dart'; 
 import 'services/database_service.dart';
 import 'services/auth_service.dart';
 import 'profile_screen.dart';
@@ -122,8 +122,6 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     );
   }
 
-  // ==================== الأجزاء التي تم إصلاحها لضمان عدم حدوث خطأ Type Mapping ====================
-
   Widget _overviewTab(AppThemeData t) {
     final online = _users.where((u) => u.isOnline).length;
     final pendingReports = _reports.where((r) => r.status == 'pending').length;
@@ -161,11 +159,10 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('آخر المستخدمين', style: TextStyle(color: t.text, fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 12),
-        // تم استخدام .toList() لضمان نوع البيانات الصحيح
         ..._users.take(5).map((u) => Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Row(children: [
-            CircleAvatar(radius: 18, backgroundColor: t.button.withOpacity(0.2), child: Text(u.fullName[0])),
+            CircleAvatar(radius: 18, backgroundColor: t.button.withOpacity(0.2), child: Text(u.fullName.isNotEmpty ? u.fullName[0] : '?')),
             const SizedBox(width: 10),
             Expanded(child: Text(u.fullName, style: TextStyle(color: t.text, fontSize: 13))),
             Container(width: 8, height: 8, decoration: BoxDecoration(color: u.isOnline ? Colors.green : Colors.grey, shape: BoxShape.circle)),
@@ -177,22 +174,22 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
 
   Widget _requestsTab(AppThemeData t) {
     if (_loadingRequests) return Center(child: CircularProgressIndicator(color: t.button));
-    // تم الإصلاح لضمان أن القائمة تعيد ويدجيت صحيحة
+    // إصلاح خطأ List<dynamic> بإضافة .cast<Widget>()
     return ListView(
       padding: const EdgeInsets.all(16), 
-      children: _requests.map((r) => _requestCard(r, t, r.status == 'pending')).toList()
+      children: _requests.map((r) => _requestCard(r, t, r.status == 'pending')).toList().cast<Widget>()
     );
   }
 
   Widget _reportsTab(AppThemeData t) {
     if (_loadingReports) return Center(child: CircularProgressIndicator(color: t.button));
+    // إصلاح خطأ List<dynamic> بإضافة .cast<Widget>()
     return ListView(
       padding: const EdgeInsets.all(16), 
-      children: _reports.map((r) => _reportCard(r, t, r.status == 'pending')).toList()
+      children: _reports.map((r) => _reportCard(r, t, r.status == 'pending')).toList().cast<Widget>()
     );
   }
 
-  // بقية الدوال (StatCard, ThemesTab, Broadcast) تبقى كما هي لأن منطقها سليم
   Widget _statCard(String title, String value, IconData icon, Color color, AppThemeData t) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -214,16 +211,18 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
       child: Column(children: [
         TextField(
           controller: _broadcastCtrl, maxLines: 2, textAlign: TextAlign.right,
-          decoration: InputDecoration(hintText: 'بث رسالة لجميع المستخدمين...', border: InputBorder.none),
+          decoration: InputDecoration(hintText: 'بث رسالة لجميع المستخدمين...', border: InputBorder.none, hintStyle: TextStyle(color: t.text.withOpacity(0.5))),
+          style: TextStyle(color: t.text),
         ),
         ElevatedButton(
           onPressed: () async {
             if (_broadcastCtrl.text.isEmpty) return;
+            // التأكد من استدعاء الدالة الصحيحة في DatabaseService
             await DatabaseService.broadcastMessage(_broadcastCtrl.text);
             _broadcastCtrl.clear();
           },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-          child: const Text('إرسال الآن'),
+          child: const Text('إرسال الآن', style: TextStyle(color: Colors.white)),
         )
       ]),
     );
@@ -249,7 +248,10 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
       itemCount: _users.length,
       itemBuilder: (ctx, i) => ListTile(
         title: Text(_users[i].fullName, style: TextStyle(color: t.text)),
-        trailing: Switch(value: _users[i].isBanned, onChanged: (v) => _toggleBan(_users[i], i)),
+        trailing: Switch(
+          value: _users[i].isBanned, 
+          onChanged: (v) => _toggleBan(_users[i], i)
+        ),
       ),
     );
   }
@@ -260,11 +262,22 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   }
 
   Widget _requestCard(AppRoomRequest req, AppThemeData t, bool actions) {
-    return Card(color: t.card, child: ListTile(title: Text(req.name, style: TextStyle(color: t.text)), subtitle: Text(req.status)));
+    return Card(
+      color: t.card, 
+      child: ListTile(
+        title: Text(req.name, style: TextStyle(color: t.text)), 
+        subtitle: Text(req.status, style: TextStyle(color: t.text.withOpacity(0.7)))
+      )
+    );
   }
 
   Widget _reportCard(AppReport rep, AppThemeData t, bool actions) {
-    return Card(color: t.card, child: ListTile(title: Text(rep.reason, style: TextStyle(color: t.text)), subtitle: Text(rep.targetName)));
+    return Card(
+      color: t.card, 
+      child: ListTile(
+        title: Text(rep.reason, style: TextStyle(color: t.text)), 
+        subtitle: Text(rep.targetName, style: TextStyle(color: t.text.withOpacity(0.7)))
+      )
+    );
   }
 }
-
