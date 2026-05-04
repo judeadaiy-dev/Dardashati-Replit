@@ -56,16 +56,52 @@ class AppUser {
   bool get isModerator => role == 'moderator' || role == 'admin';
 }
 
-// --- تحديث كلاس الثيم لحل أخطاء label, background, card ---
+class AppRoom {
+  final String id;
+  final String name;
+  final String icon;
+  final String description;
+  final String ownerId;
+  final bool isFeatured;
+  final int membersCount;
+
+  AppRoom({
+    required this.id,
+    required this.name,
+    required this.icon,
+    required this.description,
+    required this.ownerId,
+    this.isFeatured = false,
+    this.membersCount = 0,
+  });
+
+  factory AppRoom.fromMap(Map<String, dynamic> map) {
+    return AppRoom(
+      id: map['id'] as String,
+      name: map['name'] as String? ?? '',
+      icon: map['icon'] as String? ?? '💬',
+      description: map['description'] as String? ?? '',
+      ownerId: map['owner_id'] as String? ?? '',
+      isFeatured: map['is_featured'] as bool? ?? false,
+      membersCount: map['members_count'] as int? ?? 0,
+    );
+  }
+}
+
+// --- تحديث كلاس الثيم لحل كافة أخطاء الشاشات ---
 class AppThemeData {
   final String name;
-  final String label; // أضفنا الحقل المطلوب
+  final String label;
   final Color primaryColor;
   final List<Color> gradientColors;
-  final Color background; // أضفنا الحقل المطلوب
+  final Color background;
   final Color text;   
   final Color button; 
-  final Color card; // أضفنا الحقل المطلوب
+  final Color card;
+  final Color accent;      // حقل مطلوب لشاشة الإعدادات
+  final Color menu;        // حقل مطلوب لـ BottomSheets
+  final Color buttonText;  // حقل مطلوب للنصوص فوق الأزرار
+  final bool isDark;       // حقل مطلوب لمعرفة حالة الثيم
   final double borderRadius;
 
   AppThemeData({
@@ -77,11 +113,35 @@ class AppThemeData {
     required this.text,    
     required this.button,  
     required this.card,
+    required this.accent,
+    required this.menu,
+    required this.buttonText,
+    required this.isDark,
     this.borderRadius = 30.0,
   });
 }
 
-// --- تحديث طلبات الغرف لحل خطأ name ---
+// --- إضافة كلاس الإشعارات المفقود ---
+class AppNotification {
+  final String id;
+  final String title;
+  final String body;
+  final IconData icon;
+  final bool isRead;
+  final DateTime createdAt;
+
+  AppNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.icon,
+    this.isRead = false,
+    required this.createdAt,
+  });
+
+  Color iconColor(Color accentColor) => accentColor;
+}
+
 class AppRoomRequest {
   final String id;
   final String userId;
@@ -97,7 +157,6 @@ class AppRoomRequest {
     required this.createdAt,
   });
 
-  // الـ Getter الذي يطلبه ملف admin_dashboard
   String get name => roomName;
 
   factory AppRoomRequest.fromMap(Map<String, dynamic> map) {
@@ -111,20 +170,21 @@ class AppRoomRequest {
   }
 }
 
-// --- تحديث التقارير لحل خطأ targetName ---
 class AppReport {
   final String id;
   final String reporterId;
   final String reportedId;
   final String reason;
+  final String status; // أضفنا هذا الحقل لحل خطأ لوحة الإدارة
   final DateTime timestamp;
-  final String? targetName; // أضفنا الحقل المطلوب
+  final String? targetName;
 
   AppReport({
     required this.id,
     required this.reporterId,
     required this.reportedId,
     required this.reason,
+    this.status = 'pending',
     required this.timestamp,
     this.targetName,
   });
@@ -135,8 +195,10 @@ class AppReport {
       reporterId: map['reporter_id'] as String? ?? '',
       reportedId: map['reported_id'] as String? ?? '',
       reason: map['reason'] as String? ?? '',
+      status: map['status'] as String? ?? 'pending',
       timestamp: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
       targetName: map['target_name'] as String?,
     );
   }
 }
+
