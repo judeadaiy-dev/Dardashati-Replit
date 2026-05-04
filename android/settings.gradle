@@ -1,3 +1,7 @@
+// ... الكود الذي أرسلته لي سابقاً يبقى كما هو ...
+
+// أضف هذا السطر في آخر الملف تماماً إذا لم يكن موجوداً
+apply from: "${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle/app_plugin_loader.gradle"
 pluginManagement {
     def flutterSdkPath = {
         def properties = new Properties()
