@@ -1,8 +1,6 @@
-import '../models.dart';
 import 'package:flutter/material.dart';
 import 'models.dart';
 import 'services/database_service.dart';
-import 'mock_data.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final AppThemeData theme;
@@ -22,19 +20,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _load();
   }
 
+  // تم تحديث الدالة لتعمل فقط مع قاعدة البيانات الفعلية
   Future<void> _load() async {
+    setState(() => _loading = true);
     try {
       final data = await DatabaseService.getNotifications();
-      if (mounted) setState(() { _notifications = data; _loading = false; });
-    } catch (_) {
-      // fallback to mock
-      if (mounted) setState(() { _notifications = mockNotifications; _loading = false; });
+      if (mounted) {
+        setState(() { 
+          _notifications = data; 
+          _loading = false; 
+        });
+      }
+    } catch (e) {
+      // في حال الفشل، تظهر القائمة فارغة بدلاً من التعليق أو استخدام بيانات وهمية
+      if (mounted) {
+        setState(() { 
+          _notifications = []; 
+          _loading = false; 
+        });
+      }
     }
   }
 
   Future<void> _markAllRead() async {
-    await DatabaseService.markAllNotificationsRead();
-    setState(() { for (final n in _notifications) n.isRead = true; });
+    try {
+      await DatabaseService.markAllNotificationsRead();
+      setState(() { 
+        for (var n in _notifications) {
+          n.isRead = true; // تأكد من إزالة كلمة final عن isRead في ملف models.dart
+        }
+      });
+    } catch (_) {}
   }
 
   @override
@@ -51,13 +67,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           Text('الإشعارات', style: TextStyle(color: t.text, fontWeight: FontWeight.bold)),
           if (unread > 0) ...[
             const SizedBox(width: 8),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)), child: Text('$unread', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), 
+              decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)), 
+              child: Text('$unread', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))
+            ),
           ],
         ]),
-        leading: IconButton(icon: Icon(Icons.arrow_back_ios, color: t.text), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios, color: t.text), 
+          onPressed: () => Navigator.pop(context)
+        ),
         actions: [
           if (unread > 0)
-            TextButton(onPressed: _markAllRead, child: Text('قراءة الكل', style: TextStyle(color: t.button, fontSize: 13))),
+            TextButton(
+              onPressed: _markAllRead, 
+              child: Text('قراءة الكل', style: TextStyle(color: t.button, fontSize: 13))
+            ),
         ],
       ),
       body: _loading
@@ -80,8 +106,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return GestureDetector(
       onTap: () async {
         if (!n.isRead) {
-          await DatabaseService.markNotificationRead(n.id);
-          setState(() => n.isRead = true);
+          try {
+            await DatabaseService.markNotificationRead(n.id);
+            setState(() => n.isRead = true);
+          } catch (_) {}
         }
       },
       child: AnimatedContainer(
@@ -97,7 +125,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           children: [
             Container(
               width: 44, height: 44,
-              decoration: BoxDecoration(color: n.iconColor(t.accent).withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(
+                color: n.iconColor(t.accent).withOpacity(0.12), 
+                borderRadius: BorderRadius.circular(14)
+              ),
               child: Icon(n.icon, color: n.iconColor(t.accent), size: 22),
             ),
             const SizedBox(width: 12),
@@ -128,7 +159,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         children: [
           Icon(Icons.notifications_off_outlined, size: 56, color: t.text.withOpacity(0.2)),
           const SizedBox(height: 14),
-          Text('لا توجد إشعارات حتى الآن', style: TextStyle(color: t.text.withOpacity(0.35), fontSize: 15)),
+          Text('لا توجد إشعارات حالياً', style: TextStyle(color: t.text.withOpacity(0.35), fontSize: 15)),
         ],
       ),
     );
