@@ -19,7 +19,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # هذه هي الخطوة الجديدة لاستخراج المفتاح فوراً
+      # استخراج مفتاح SHA-1 فوراً
       - name: Extract SHA1
         run: |
           echo "--- GOOGLE_AUTH_KEY_START ---"
@@ -34,17 +34,5 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Create local.properties
-        run: echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-
-      - name: Clean Project
-        run: flutter clean
-
       - name: Build APK
         run: flutter build apk --release
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
