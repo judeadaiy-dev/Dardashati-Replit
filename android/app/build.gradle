@@ -4,20 +4,8 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
-// --- قسم الطباعة الفورية للمفتاح ---
-// هذا الجزء سيطبع البيانات في سجلات GitHub بمجرد بدء المهمة
-println("--- START_KEY_EXTRACTION ---")
 android {
-    signingConfigs {
-        debug {
-            // سطر لطباعة الـ SHA1 يدوياً في السجل
-            println("MY_SHA1_KEY: " + it.signingConfig)
-        }
-    }
-}
-println("--- END_KEY_EXTRACTION ---")
-
-android {
+    // الهوية الرسمية للتطبيق التي سجلناها في جوجل وسوبابيس
     namespace "com.dardashati.app" 
     compileSdk 34
     
@@ -34,12 +22,15 @@ android {
 
     defaultConfig {
         applicationId "com.dardashati.app"
-        minSdk 21
+        // الحد الأدنى لنسخة أندرويد لضمان عمل تطبيقك على معظم الأجهزة
+        minSdk 21 
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
     }
 
+    // إعدادات التوقيع (Signing)
+    // هنا نستخدم مفتاح الـ debug للـ release بشكل مؤقت حتى ننهي التطبيق بالكامل
     buildTypes {
         release {
             signingConfig signingConfigs.debug 
@@ -54,5 +45,5 @@ flutter {
 }
 
 dependencies {
-    // يبقى فارغاً
+    // يتم ملء التبعيات تلقائياً عبر Flutter
 }
