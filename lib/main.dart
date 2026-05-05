@@ -1,56 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart'; // ضروري للـ PlatformDispatcher
+import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// استدعاء الخدمات والمودلز الخاصة بك
-import 'services/supabase_service.dart';
-import 'services/auth_service.dart';
-import 'services/database_service.dart';
-import 'utils/logger.dart'; // تأكد من وجود ملف الـ Logger الذي أنشأناه
-import 'models.dart';
-import 'app_theme.dart';
-import 'home_screen.dart';
-import 'login_screen.dart';
+// استدعاء المكونات المعتمدة لمشروع دردشاتي
+import 'package:dardashati/models.dart';
+import 'package:dardashati/app_theme.dart'; // الملف الذي يحتوي على AppThemes
+import 'package:dardashati/services/database_service.dart';
+import 'package:dardashati/home_screen.dart';
+import 'package:dardashati/login_screen.dart';
 
-// --- دالة الـ main الموحدة (تم إصلاح التضارب هنا) ---
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. تثبيت اتجاه الشاشة
+  // 1. إعدادات الشاشة (الوضع العمودي فقط لضمان جمالية التصميم)
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
   ]);
 
-  // 2. تهيئة Supabase (استخدم بياناتك الحقيقية هنا)
-  // ملاحظة: يفضل استخدام SupabaseService.initialize() إذا كان يحتوي على الإعدادات
-  await SupabaseService.initialize();
+  // 2. تهيئة Supabase (تأكد من وضع رابط الـ URL والـ Anon Key الخاص بك)
+  await Supabase.initialize(
+    url: 'YOUR_SUPABASE_URL', 
+    anonKey: 'YOUR_SUPABASE_ANON_KEY',
+  );
 
-  // 3. --- تفعيل المراقب الصامت الاحترافي ---
-  // التقاط أخطاء الواجهة (UI)
-  FlutterError.onError = (details) {
-    AppLogger.error("UI_ERROR", details.exceptionAsString());
-  };
-  
-  // التقاط أخطاء الخلفية والداتابيز (Async)
-  PlatformDispatcher.instance.onError = (error, stack) {
-    AppLogger.error("SYSTEM_ERROR", error.toString());
-    return true;
-  };
-
-  runApp(const TikChatApp());
+  runApp(const DardashatiApp());
 }
 
-class TikChatApp extends StatefulWidget {
-  const TikChatApp({super.key}); // إضافة الـ Key بشكل صحيح
+class DardashatiApp extends StatefulWidget {
+  const DardashatiApp({super.key});
 
   @override
-  State<TikChatApp> createState() => _TikChatAppState();
+  State<DardashatiApp> createState() => _DardashatiAppState();
 }
 
-class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
+class _DardashatiAppState extends State<DardashatiApp> {
+  // الثيم الافتراضي عند أول تشغيل
   AppThemeData _currentTheme = AppThemes.allThemes[0];
   bool _initialized = false;
   final _navigatorKey = GlobalKey<NavigatorState>();
@@ -58,49 +44,41 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _initTheme();
-    _setupDeepLinkListener();
+    _loadInitialSettings();
+    _listenToAuthChanges();
   }
 
-  // مستمع الروابط العميقة (Deep Links) لإصلاح الصفحة الفارغة
-  void _setupDeepLinkListener() {
-    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      final AuthChangeEvent event = data.event;
-      if (event == AuthChangeEvent.passwordRecovery) {
-        AppLogger.info("AUTH", "تم استقبال رابط استعادة كلمة المرور ✅");
-        _navigatorKey.currentState?.push(
-          MaterialPageRoute(
-            builder: (_) => UpdatePasswordScreen(theme: _currentTheme),
-          ),
-        );
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  Future<void> _initTheme() async {
+  // تحميل الإعدادات الأولية (الثيم المحفوظ)
+  Future<void> _loadInitialSettings() async {
     try {
-      if (AuthService.isLoggedIn) {
-        final savedTheme = await DatabaseService.getUserTheme();
-        final found = AppThemes.allThemes.where((t) => t.name == savedTheme).toList();
-        if (found.isNotEmpty) setState(() => _currentTheme = found.first);
+      // محاولة جلب الثيم من قاعدة البيانات إذا كان المستخدم مسجلاً
+      if (Supabase.instance.client.auth.currentUser != null) {
+        // هنا يمكن استدعاء دالة جلب الثيم من DatabaseService
+        // final savedThemeName = await DatabaseService.getUserTheme();
+        // _applyThemeByName(savedThemeName);
       }
     } catch (e) {
-      AppLogger.error("THEME", "فشل تحميل الثيم", e);
+      debugPrint("Theme Error: $e");
     } finally {
       setState(() => _initialized = true);
     }
   }
 
+  // مراقبة حالة الدخول للتعامل مع روابط استعادة كلمة المرور
+  void _listenToAuthChanges() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => UpdatePasswordScreen(theme: _currentTheme)),
+        );
+      }
+    });
+  }
+
   void _changeTheme(AppThemeData newTheme) {
     setState(() => _currentTheme = newTheme);
-    DatabaseService.saveUserTheme(newTheme.name);
+    // حفظ الثيم في السحابة ليكون متاحاً على أي جهاز آخر
+    // DatabaseService.saveUserTheme(newTheme.name);
   }
 
   @override
@@ -109,6 +87,7 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
       navigatorKey: _navigatorKey,
       title: 'دردشاتي',
       debugShowCheckedModeBanner: false,
+      // دعم كامل للغة العربية من اليمين لليسار (RTL)
       locale: const Locale('ar', 'SA'),
       supportedLocales: const [Locale('ar', 'SA')],
       localizationsDelegates: const [
@@ -117,61 +96,98 @@ class _TikChatAppState extends State<TikChatApp> with WidgetsBindingObserver {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: ThemeData(
-        fontFamily: 'Tajawal',
+        fontFamily: 'Tajawal', // الخط العربي المعتمد للتطبيق
         useMaterial3: true,
+        brightness: _currentTheme.isDark ? Brightness.dark : Brightness.light,
       ),
-      // حماية التطبيق بـ AuthGate أو عرض شاشة التحميل
-      home: _initialized 
-          ? _AuthGate(theme: _currentTheme, onThemeChanged: _changeTheme) 
-          : _SplashScreen(theme: _currentTheme),
+      home: !_initialized 
+          ? _buildLoadingScreen() 
+          : _AuthGate(theme: _currentTheme, onThemeChanged: _changeTheme),
+    );
+  }
+
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      backgroundColor: _currentTheme.background,
+      body: Center(child: CircularProgressIndicator(color: _currentTheme.primaryColor)),
     );
   }
 }
 
 // -------------------------------------------------------------------------
-// واجهة تحديث كلمة المرور (معدلة لتناسب الهوية البصرية)
+// بوابة التحقق (AuthGate): هي التي تقرر أين يذهب المستخدم
 // -------------------------------------------------------------------------
-class UpdatePasswordScreen extends StatelessWidget {
+class _AuthGate extends StatelessWidget {
   final AppThemeData theme;
-  UpdatePasswordScreen({super.key, required this.theme});
-  final _passController = TextEditingController();
+  final Function(AppThemeData) onThemeChanged;
+
+  const _AuthGate({required this.theme, required this.onThemeChanged});
 
   @override
   Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        final session = Supabase.instance.client.auth.currentSession;
+
+        if (session != null) {
+          // المستخدم مسجل دخول -> وجهه للرئيسية
+          final user = AppUser(
+            id: session.user.id,
+            fullName: session.user.userMetadata?['full_name'] ?? 'مستخدم',
+            avatarUrl: session.user.userMetadata?['avatar_url'] ?? '',
+            isOnline: true,
+          );
+          return HomeScreen(currentUser: user, theme: theme, onThemeChanged: onThemeChanged);
+        }
+
+        // المستخدم غير مسجل -> وجهه لشاشة الدخول
+        return LoginScreen(theme: theme, onThemeChanged: onThemeChanged, isLogin: true);
+      },
+    );
+  }
+}
+
+// -------------------------------------------------------------------------
+// شاشة تحديث كلمة المرور (عند استلام رابط الإيميل)
+// -------------------------------------------------------------------------
+class UpdatePasswordScreen extends StatelessWidget {
+  final AppThemeData theme;
+  const UpdatePasswordScreen({super.key, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    final passController = TextEditingController();
     return Scaffold(
       backgroundColor: theme.background,
-      appBar: AppBar(
-        title: Text('تحديث كلمة المرور', style: TextStyle(color: theme.text)),
-        backgroundColor: theme.menu,
-      ),
+      appBar: AppBar(title: const Text('كلمة مرور جديدة'), backgroundColor: Colors.transparent),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(25),
         child: Column(
           children: [
             TextField(
-              controller: _passController,
-              style: TextStyle(color: theme.text),
+              controller: passController,
+              obscureText: true,
               decoration: InputDecoration(
-                labelText: 'كلمة المرور الجديدة',
+                labelText: 'أدخل كلمة المرور الجديدة',
                 labelStyle: TextStyle(color: theme.primaryColor),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: theme.primaryColor)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: theme.button),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.button,
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              ),
               onPressed: () async {
-                try {
-                  await Supabase.instance.client.auth.updateUser(
-                    UserAttributes(password: _passController.text.trim())
-                  );
-                  AppLogger.success("AUTH", "تم تحديث كلمة المرور بنجاح");
-                  if (context.mounted) Navigator.pop(context);
-                } catch (e) {
-                  AppLogger.error("AUTH", "فشل تحديث كلمة المرور", e);
-                }
+                await Supabase.instance.client.auth.updateUser(
+                  UserAttributes(password: passController.text.trim())
+                );
+                if (context.mounted) Navigator.pop(context);
               },
-              child: Text('حفظ التغييرات', style: TextStyle(color: theme.buttonText)),
+              child: Text('تحديث الآن', style: TextStyle(color: theme.buttonText)),
             )
           ],
         ),
@@ -179,5 +195,3 @@ class UpdatePasswordScreen extends StatelessWidget {
     );
   }
 }
-
-// استمر بإضافة _AuthGate و _ProfileLoader و _SplashScreen أسفل هذا الملف...
