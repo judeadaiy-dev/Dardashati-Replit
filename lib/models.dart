@@ -1,45 +1,55 @@
 import 'package:flutter/material.dart';
 
-// ==================== Enums ====================
+// ==================== Enums (للتنظيم الاحترافي) ====================
 enum IconStyle { minimal, bold, soft }
 enum FilterType { all, online, banned, pending }
 
 // ==================== Models ====================
 
-// --- كلاس الرسائل (تمت إضافته لحل أخطاء شاشة الدردشة) ---
+// --- 1. كلاس الرسائل (المحرك الأساسي للدردشة) ---
 class AppMessage {
   final String id;
   final String senderId;
-  final String senderName;
-  final String? senderAvatar;
   final String content;
   final DateTime time;
-  final bool isMe;
+  final String? senderName;
+  final String? senderAvatar;
+  final String? replyToId; // لدعم خاصية الرد مثل تليجرام
 
   AppMessage({
     required this.id,
     required this.senderId,
-    required this.senderName,
-    this.senderAvatar,
     required this.content,
     required this.time,
-    this.isMe = false,
+    this.senderName,
+    this.senderAvatar,
+    this.replyToId,
   });
+
+  // محول البيانات من Supabase إلى كود Dart
+  factory AppMessage.fromMap(Map<String, dynamic> map) {
+    return AppMessage(
+      id: map['id']?.toString() ?? '',
+      senderId: map['user_id']?.toString() ?? '',
+      content: map['content']?.toString() ?? '',
+      time: DateTime.parse(map['created_at'] ?? DateTime.now().toIso8601String()),
+      senderName: map['user_name'],
+      senderAvatar: map['avatar_url'],
+      replyToId: map['reply_to_id'],
+    );
+  }
 }
 
+// --- 2. كلاس المستخدم (هوية دردشاتي) ---
 class AppUser {
   final String id;
   final String fullName;
   final String email; 
   final String avatarUrl;
   final bool isOnline;
-  final String? zodiac;
-  final String? gender;
   final String? bio;
-  final bool isBanned;
   final String role; 
-  int followersCount;
-  int followingCount;
+  final bool isBanned;
 
   AppUser({
     required this.id,
@@ -47,78 +57,34 @@ class AppUser {
     required this.email,
     required this.avatarUrl,
     this.isOnline = false,
-    this.zodiac,
-    this.gender,
     this.bio,
-    this.isBanned = false,
     this.role = 'user',
-    this.followersCount = 0,
-    this.followingCount = 0,
+    this.isBanned = false,
   });
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
     return AppUser(
-      id: map['id'] as String,
-      fullName: map['full_name'] as String? ?? '',
-      email: map['email'] as String? ?? '', 
-      avatarUrl: map['avatar_url'] as String? ?? '',
-      isOnline: map['is_online'] as bool? ?? false,
-      zodiac: map['zodiac'] as String?,
-      gender: map['gender'] as String?,
-      bio: map['bio'] as String?,
-      isBanned: map['is_banned'] as bool? ?? false,
-      role: map['role'] as String? ?? 'user',
-      followersCount: map['followers_count'] as int? ?? 0,
-      followingCount: map['following_count'] as int? ?? 0,
+      id: map['id'] ?? '',
+      fullName: map['full_name'] ?? 'مستخدم جديد',
+      email: map['email'] ?? '', 
+      avatarUrl: map['avatar_url'] ?? '',
+      isOnline: map['is_online'] ?? false,
+      bio: map['bio'],
+      role: map['role'] ?? 'user',
+      isBanned: map['is_banned'] ?? false,
     );
   }
 
   bool get isAdmin => role == 'admin';
-  bool get isModerator => role == 'moderator' || role == 'admin';
 }
 
-class AppRoom {
-  final String id;
-  final String name;
-  final String icon;
-  final String description;
-  final String ownerId;
-  final bool isFeatured;
-  final int membersCount;
-
-  AppRoom({
-    required this.id,
-    required this.name,
-    required this.icon,
-    required this.description,
-    required this.ownerId,
-    this.isFeatured = false,
-    this.membersCount = 0,
-  });
-
-  factory AppRoom.fromMap(Map<String, dynamic> map) {
-    return AppRoom(
-      id: map['id'] as String,
-      name: map['name'] as String? ?? '',
-      icon: map['icon'] as String? ?? '💬',
-      description: map['description'] as String? ?? '',
-      ownerId: map['owner_id'] as String? ?? '',
-      isFeatured: map['is_featured'] as bool? ?? false,
-      membersCount: map['members_count'] as int? ?? 0,
-    );
-  }
-}
-
+// --- 3. كلاس الثيم (السر وراء Glassmorphism) ---
 class AppThemeData {
   final String name;
-  final String label;
-  final Color primaryColor;
-  final List<Color> gradientColors;
   final Color background;
   final Color text;   
   final Color button; 
   final Color card;
-  final Color accent;      
   final Color menu;        
   final Color buttonText;  
   final bool isDark;       
@@ -126,98 +92,52 @@ class AppThemeData {
 
   AppThemeData({
     required this.name,
-    required this.label,
-    required this.primaryColor,
-    required this.gradientColors,
     required this.background,
     required this.text,    
     required this.button,  
     required this.card,
-    required this.accent,
     required this.menu,
     required this.buttonText,
     required this.isDark,
-    this.borderRadius = 30.0,
-  });
-}
-
-// --- تعديل كلاس الإشعارات (إزالة final عن isRead) ---
-class AppNotification {
-  final String id;
-  final String title;
-  final String body;
-  final IconData icon;
-  bool isRead; // تمت إزالة final لتتمكن من تعديلها في شاشة الإشعارات
-  final DateTime createdAt;
-
-  AppNotification({
-    required this.id,
-    required this.title,
-    required this.body,
-    required this.icon,
-    this.isRead = false,
-    required this.createdAt,
+    this.borderRadius = 40.0, // انحناء كبير كما طلبت 40
   });
 
-  Color iconColor(Color accentColor) => accentColor;
+  // ثيم افتراضي فخم (Dark Glass) لضمان عدم حدوث خطأ
+  static AppThemeData dark() => AppThemeData(
+    name: 'dark',
+    background: const Color(0xFF0F172A),
+    text: Colors.white,
+    button: const Color(0xFF38BDF8),
+    card: const Color(0xFF1E293B),
+    menu: const Color(0xFF1E293B),
+    buttonText: Colors.white,
+    isDark: true,
+  );
 }
 
-class AppRoomRequest {
-  final String id;
-  final String userId;
-  final String roomName;
-  final String status; 
-  final DateTime createdAt;
-
-  AppRoomRequest({
-    required this.id,
-    required this.userId,
-    required this.roomName,
-    required this.status,
-    required this.createdAt,
-  });
-
-  String get name => roomName;
-
-  factory AppRoomRequest.fromMap(Map<String, dynamic> map) {
-    return AppRoomRequest(
-      id: map['id'] as String,
-      userId: map['user_id'] as String? ?? '',
-      roomName: map['room_name'] as String? ?? '',
-      status: map['status'] as String? ?? 'pending',
-      createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
-    );
-  }
-}
-
+// --- 4. كلاس البلاغات (لأمان التطبيق) ---
 class AppReport {
   final String id;
   final String reporterId;
   final String reportedId;
   final String reason;
-  final String status; 
-  final DateTime timestamp;
-  final String? targetName;
+  final DateTime createdAt;
 
   AppReport({
     required this.id,
     required this.reporterId,
     required this.reportedId,
     required this.reason,
-    this.status = 'pending',
-    required this.timestamp,
-    this.targetName,
+    required this.createdAt,
   });
 
   factory AppReport.fromMap(Map<String, dynamic> map) {
     return AppReport(
-      id: map['id'] as String,
-      reporterId: map['reporter_id'] as String? ?? '',
-      reportedId: map['reported_id'] as String? ?? '',
-      reason: map['reason'] as String? ?? '',
-      status: map['status'] as String? ?? 'pending',
-      timestamp: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
-      targetName: map['target_name'] as String?,
+      id: map['id'] ?? '',
+      reporterId: map['reporter_id'] ?? '',
+      reportedId: map['reported_id'] ?? '',
+      reason: map['reason'] ?? '',
+      createdAt: DateTime.parse(map['created_at'] ?? DateTime.now().toIso8601String()),
     );
   }
 }
