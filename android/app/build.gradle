@@ -4,6 +4,19 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// --- قسم الطباعة الفورية للمفتاح ---
+// هذا الجزء سيطبع البيانات في سجلات GitHub بمجرد بدء المهمة
+println("--- START_KEY_EXTRACTION ---")
+android {
+    signingConfigs {
+        debug {
+            // سطر لطباعة الـ SHA1 يدوياً في السجل
+            println("MY_SHA1_KEY: " + it.signingConfig)
+        }
+    }
+}
+println("--- END_KEY_EXTRACTION ---")
+
 android {
     namespace "com.dardashati.app" 
     compileSdk 34
@@ -25,10 +38,6 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
-
-        // السطر السحري لاستخراج الكود بدون تيرمنال
-        // سيظهر في سجلات GitHub Actions تحت اسم MY_SHA1_KEY
-        resValue "string", "build_time", "SHA1: " + signingConfigs.debug
     }
 
     buildTypes {
@@ -39,9 +48,6 @@ android {
         }
     }
 }
-
-// السطر الذي وضعته أنت سنضعه هنا ليكون واضحاً في السجلات
-println("MY_SHA1_KEY: " + android.signingConfigs.debug)
 
 flutter {
     source '../..'
