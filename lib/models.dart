@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-// ==================== Enums (للتنظيم الاحترافي) ====================
+// ==================== Enums ====================
 enum IconStyle { minimal, bold, soft }
 enum FilterType { all, online, banned, pending }
 
 // ==================== Models ====================
 
-// --- 1. كلاس الرسائل (المحرك الأساسي للدردشة) ---
+// --- 1. كلاس الرسائل ---
 class AppMessage {
   final String id;
   final String senderId;
@@ -14,7 +14,7 @@ class AppMessage {
   final DateTime time;
   final String? senderName;
   final String? senderAvatar;
-  final String? replyToId; // لدعم خاصية الرد مثل تليجرام
+  final String? replyToId;
 
   AppMessage({
     required this.id,
@@ -26,7 +26,6 @@ class AppMessage {
     this.replyToId,
   });
 
-  // محول البيانات من Supabase إلى كود Dart
   factory AppMessage.fromMap(Map<String, dynamic> map) {
     return AppMessage(
       id: map['id']?.toString() ?? '',
@@ -40,7 +39,7 @@ class AppMessage {
   }
 }
 
-// --- 2. كلاس المستخدم (هوية دردشاتي) ---
+// --- 2. كلاس المستخدم (تم تحديثه ليدعم الثيم) ---
 class AppUser {
   final String id;
   final String fullName;
@@ -50,6 +49,7 @@ class AppUser {
   final String? bio;
   final String role; 
   final bool isBanned;
+  final String themePreference; // أضفنا هذا لربطه مع شاشة الإعدادات
 
   AppUser({
     required this.id,
@@ -60,6 +60,7 @@ class AppUser {
     this.bio,
     this.role = 'user',
     this.isBanned = false,
+    this.themePreference = 'dark',
   });
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
@@ -72,13 +73,52 @@ class AppUser {
       bio: map['bio'],
       role: map['role'] ?? 'user',
       isBanned: map['is_banned'] ?? false,
+      themePreference: map['theme_preference'] ?? 'dark',
     );
   }
 
   bool get isAdmin => role == 'admin';
 }
 
-// --- 3. كلاس الثيم (السر وراء Glassmorphism) ---
+// --- 3. كلاس الإشعارات (هذا ما كان ينقص البناء!) ---
+class AppNotification {
+  final String id;
+  final String title;
+  final String body;
+  final IconData icon;
+  final bool isRead;
+  final DateTime createdAt;
+
+  AppNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.icon,
+    required this.isRead,
+    required this.createdAt,
+  });
+
+  factory AppNotification.fromMap(Map<String, dynamic> map) {
+    return AppNotification(
+      id: map['id']?.toString() ?? '',
+      title: map['title'] ?? 'إشعار جديد',
+      body: map['body'] ?? '',
+      isRead: map['is_read'] ?? false,
+      createdAt: DateTime.parse(map['created_at'] ?? DateTime.now().toIso8601String()),
+      icon: _getIconForType(map['type']),
+    );
+  }
+
+  static IconData _getIconForType(String? type) {
+    switch (type) {
+      case 'message': return Icons.chat_bubble_outline;
+      case 'system': return Icons.info_outline;
+      default: return Icons.notifications_none;
+    }
+  }
+}
+
+// --- 4. كلاس الثيم ---
 class AppThemeData {
   final String name;
   final Color background;
@@ -99,10 +139,9 @@ class AppThemeData {
     required this.menu,
     required this.buttonText,
     required this.isDark,
-    this.borderRadius = 40.0, // انحناء كبير كما طلبت 40
+    this.borderRadius = 40.0,
   });
 
-  // ثيم افتراضي فخم (Dark Glass) لضمان عدم حدوث خطأ
   static AppThemeData dark() => AppThemeData(
     name: 'dark',
     background: const Color(0xFF0F172A),
@@ -115,7 +154,7 @@ class AppThemeData {
   );
 }
 
-// --- 4. كلاس البلاغات (لأمان التطبيق) ---
+// --- 5. كلاس البلاغات ---
 class AppReport {
   final String id;
   final String reporterId;
