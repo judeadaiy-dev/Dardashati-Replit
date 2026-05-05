@@ -1,3 +1,4 @@
+import 'package:dardashati/extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:blur/blur.dart'; // المكتبة التي أضفناها للتأثير الزجاجي
