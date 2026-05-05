@@ -1,4 +1,4 @@
-name: Build Dardashati APK
+name: Build Dardashati App V2
 
 # منع الزحام: سيقوم بإلغاء أي بناء قديم بمجرد بدء بناء جديد
 concurrency:
