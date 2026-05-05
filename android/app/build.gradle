@@ -5,9 +5,10 @@ plugins {
 }
 
 android {
-    namespace "com.tikchat.app"
+    // الـ namespace يجب أن يكون بتنسيق نقاط (com.name.app) وليس رابطاً
+    namespace "com.dardashati.app" 
     compileSdk 34
-    // تم تعديل طريقة كتابة ndkVersion لتكون أكثر أماناً في الإصدارات الحديثة
+    
     ndkVersion "25.1.8937393" 
 
     compileOptions {
@@ -20,8 +21,9 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.tikchat.app"
-        // تم تغيير التسمية إلى minSdk و targetSdk (بدون Version) لأنها الطريقة الأحدث
+        // هذا هو الأهم، يجب أن يتطابق مع ما وضعته في Google Cloud Console
+        applicationId "com.dardashati.app"
+        
         minSdk 21
         targetSdk 34
         versionCode 1
@@ -30,7 +32,6 @@ android {
 
     buildTypes {
         release {
-            // توقيع التطبيق للـ Release
             signingConfig signingConfigs.debug 
             minifyEnabled false
             shrinkResources false
@@ -43,6 +44,5 @@ flutter {
 }
 
 dependencies {
-    // يفضل دائماً ترك قسم dependencies فارغاً إذا كنت تعتمد على Plugins فقط
-    // أو إضافة أي مكتبات native تحتاجها هنا
+    // يبقى فارغاً كما فضلت
 }
