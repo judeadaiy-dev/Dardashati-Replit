@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'models.dart';
-import 'services/auth_service.dart';
-import 'services/database_service.dart';
+import 'package:dardashati/models.dart';
+import 'package:dardashati/services/database_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final AppThemeData theme;
@@ -30,7 +29,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
 
-  // الحصول على نسخة Supabase لاستخدامها في إعادة التعيين
   final SupabaseClient supabase = Supabase.instance.client;
 
   @override
@@ -45,70 +43,69 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // دالة إعادة تعيين كلمة المرور (المضافة والمصلحة)
-  Future<void> _resetPassword() async {
-    final email = _email.text.trim();
-    if (email.isEmpty) {
-      setState(() => _error = 'يرجى كتابة بريدك الإلكتروني أولاً في الحقل أعلاه');
-      return;
-    }
-
-    setState(() => _loading = true);
+  // --- دالة تسجيل الدخول عبر جوجل ---
+  Future<void> _handleGoogleSignIn() async {
+    setState(() { _loading = true; _error = null; });
     try {
-      await supabase.auth.resetPasswordForEmail(
-        email,
-        // الرابط الذي تم ضبطه في Supabase و AndroidManifest
-        redirectTo: 'dardashati://callback', 
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني', textAlign: TextAlign.right),
-            backgroundColor: Colors.green,
-          ),
-        );
+      final res = await DatabaseService.signInWithGoogle();
+      if (res != null && mounted) {
+        Navigator.of(context).popUntil((r) => r.isFirst);
       }
     } catch (e) {
-      setState(() => _error = 'فشل إرسال الرابط، تأكد من صحة البريد');
+      setState(() => _error = "فشل تسجيل الدخول عبر جوجل، حاول مجدداً");
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  // --- دالة إعادة تعيين كلمة المرور ---
+  Future<void> _resetPassword() async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'يرجى إدخال بريدك الإلكتروني أولاً');
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      await supabase.auth.resetPasswordForEmail(email, redirectTo: 'dardashati://callback');
+      if (mounted) _showSuccess('تم إرسال رابط إعادة التعيين لبريدك');
+    } catch (e) {
+      setState(() => _error = 'فشل الإرسال، تأكد من صحة البريد');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // --- دالة الإرسال الأساسية (Email/Password) ---
   Future<void> _submit() async {
     if (_loading) return;
     setState(() { _loading = true; _error = null; });
-    
     try {
       if (_isLogin) {
-        await AuthService.signIn(email: _email.text.trim(), password: _password.text.trim());
-        await DatabaseService.getUserTheme();
+        await supabase.auth.signInWithPassword(
+          email: _email.text.trim(), 
+          password: _password.text.trim()
+        );
         if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
       } else {
         if (_name.text.trim().isEmpty) {
-          setState(() { _error = 'يرجى إدخال الاسم'; _loading = false; });
+          setState(() { _error = 'الاسم مطلوب'; _loading = false; });
           return;
         }
-        await AuthService.signUp(
+        await supabase.auth.signUp(
           email: _email.text.trim(), 
-          password: _password.text.trim(), 
-          fullName: _name.text.trim()
+          password: _password.text.trim(),
+          data: {'full_name': _name.text.trim()},
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم إنشاء الحساب بنجاح!'))
-          );
-          Navigator.of(context).popUntil((r) => r.isFirst);
+          _showSuccess('تم إنشاء الحساب! يرجى التحقق من بريدك');
+          setState(() => _isLogin = true);
         }
       }
     } on AuthException catch (e) {
-      String msg = e.message;
-      if (msg.contains('Invalid login')) msg = 'البريد أو كلمة المرور غير صحيحة';
-      if (msg.contains('already registered')) msg = 'هذا البريد مسجل مسبقاً';
-      if (msg.contains('Password should be')) msg = 'كلمة المرور ضعيفة (6 أحرف على الأقل)';
-      setState(() => _error = msg);
+      setState(() => _error = _mapAuthError(e.message));
     } catch (e) {
-      setState(() => _error = 'حدث خطأ، تأكد من اتصالك بالإنترنت');
+      setState(() => _error = 'تأكد من اتصالك بالإنترنت');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -116,122 +113,70 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = widget.theme;
     return Scaffold(
+      backgroundColor: t.background,
       body: Stack(
         children: [
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFF6F3FF), Color(0xFFEAF8F6)],
+                colors: t.gradientColors,
               ),
             ),
           ),
-          Positioned(
-            top: -50,
-            left: -50,
-            child: _BlurOrb(color: const Color(0xFFC9BEFF).withOpacity(0.3), size: 200),
-          ),
+          Positioned(top: -50, left: -50, child: _BlurOrb(color: t.button.withOpacity(0.2), size: 200)),
+          
           SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 10),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.5), shape: BoxShape.circle),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF7C6BE0), size: 20),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    _isLogin ? 'مرحباً بك مجدداً' : 'انضم لأسرتنا',
-                    style: const TextStyle(color: Color(0xFF2A2750), fontSize: 32, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _isLogin ? 'سجل دخولك لمتابعة محادثاتك' : 'ابدأ تجربتك الفريدة في دردشاتي',
-                    style: TextStyle(color: const Color(0xFF2A2750).withOpacity(0.6), fontSize: 15, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 35),
-
-                  if (_error != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.red.withOpacity(0.1)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold))),
-                        ],
-                      ),
-                    ),
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildBackButton(t),
                     const SizedBox(height: 20),
-                  ],
+                    Text(_isLogin ? 'مرحباً بك مجدداً' : 'ابدأ رحلتك معنا',
+                      style: TextStyle(color: t.text, fontSize: 30, fontWeight: FontWeight.w900, fontFamily: 'Tajawal')),
+                    const SizedBox(height: 8),
+                    Text(_isLogin ? 'سجل دخولك لمتابعة محادثاتك' : 'أنشئ حسابك واستمتع بتجربة دردشة فريدة',
+                      style: TextStyle(color: t.text.withOpacity(0.6), fontSize: 14)),
+                    const SizedBox(height: 30),
 
-                  if (!_isLogin) ...[
-                    _buildField(label: 'الاسم الكامل', icon: Icons.person_outline_rounded, controller: _name),
+                    if (_error != null) _buildErrorBox(t),
+
+                    if (!_isLogin) ...[
+                      _buildField(t, label: 'الاسم الكامل', icon: Icons.person_outline_rounded, controller: _name),
+                      const SizedBox(height: 16),
+                    ],
+                    _buildField(t, label: 'البريد الإلكتروني', icon: Icons.alternate_email_rounded, controller: _email, keyboardType: TextInputType.emailAddress),
                     const SizedBox(height: 16),
-                  ],
-                  _buildField(label: 'البريد الإلكتروني', icon: Icons.alternate_email_rounded, controller: _email, keyboardType: TextInputType.emailAddress),
-                  const SizedBox(height: 16),
-                  _buildField(label: 'كلمة المرور', icon: Icons.lock_open_rounded, controller: _password, isPassword: true),
-                  
-                  // زر "نسيت كلمة المرور" المضاف حديثاً
-                  if (_isLogin) 
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: _resetPassword,
-                        child: const Text('نسيت كلمة المرور؟', style: TextStyle(color: Color(0xFF7C6BE0), fontSize: 13, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-
-                  const SizedBox(height: 30),
-                  
-                  GestureDetector(
-                    onTap: _submit,
-                    child: Container(
-                      height: 62,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFF7C6BE0), Color(0xFF3FB8B0)]),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: const Color(0xFF7C6BE0).withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
-                      ),
-                      child: Center(
-                        child: _loading 
-                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                          : Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 25),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => setState(() => _isLogin = !_isLogin),
-                      child: RichText(
-                        text: TextSpan(
-                          style: const TextStyle(fontFamily: 'Tajawal', fontSize: 14),
-                          children: [
-                            TextSpan(text: _isLogin ? 'ليس لديك حساب؟ ' : 'لديك حساب بالفعل؟ ', style: const TextStyle(color: Color(0xFF2A2750))),
-                            TextSpan(text: _isLogin ? 'سجل الآن' : 'ادخل من هنا', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF3FB8B0))),
-                          ],
+                    _buildField(t, label: 'كلمة المرور', icon: Icons.lock_outline_rounded, controller: _password, isPassword: true),
+                    
+                    if (_isLogin) 
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: _resetPassword,
+                          child: Text('نسيت كلمة المرور؟', style: TextStyle(color: t.button, fontWeight: FontWeight.bold, fontSize: 13)),
                         ),
                       ),
-                    ),
-                  ),
-                ],
+
+                    const SizedBox(height: 25),
+                    _buildSubmitButton(t),
+                    
+                    const SizedBox(height: 16),
+                    _buildDivider(t),
+                    const SizedBox(height: 16),
+                    
+                    _buildGoogleButton(t),
+
+                    const SizedBox(height: 25),
+                    _buildToggleAuth(t),
+                  ],
+                ),
               ),
             ),
           ),
@@ -240,25 +185,78 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildField({required String label, required IconData icon, required TextEditingController controller, bool isPassword = false, TextInputType? keyboardType}) {
+  // --- زر تسجيل الدخول العادي ---
+  Widget _buildSubmitButton(AppThemeData t) {
+    return InkWell(
+      onTap: _submit,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        height: 60,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: t.button,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: t.button.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
+        ),
+        child: Center(
+          child: _loading 
+            ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: t.buttonText, strokeWidth: 2))
+            : Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب', 
+                style: TextStyle(color: t.buttonText, fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+      ),
+    );
+  }
+
+  // --- زر جوجل المدمج والمنسق ---
+  Widget _buildGoogleButton(AppThemeData t) {
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        fixedSize: const Size(double.maxFinite, 60),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        side: BorderSide(color: t.button.withOpacity(0.3), width: 1.5),
+        backgroundColor: t.card.withOpacity(0.2),
+      ),
+      icon: Image.network('https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.png', height: 22),
+      label: Text('الدخول عبر جوجل', 
+        style: TextStyle(color: t.text, fontWeight: FontWeight.bold, fontSize: 15)),
+      onPressed: _loading ? null : _handleGoogleSignIn,
+    );
+  }
+
+  // --- فاصل "أو" ---
+  Widget _buildDivider(AppThemeData t) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: t.text.withOpacity(0.1))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          child: Text('أو', style: TextStyle(color: t.text.withOpacity(0.3), fontSize: 12)),
+        ),
+        Expanded(child: Divider(color: t.text.withOpacity(0.1))),
+      ],
+    );
+  }
+
+  Widget _buildField(AppThemeData t, {required String label, required IconData icon, required TextEditingController controller, bool isPassword = false, TextInputType? keyboardType}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.4),
+        color: t.card.withOpacity(0.4),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.6), width: 1.5),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: TextField(
         controller: controller,
         obscureText: isPassword && _obscure,
         keyboardType: keyboardType,
         textAlign: TextAlign.right,
-        style: const TextStyle(color: Color(0xFF2A2750), fontWeight: FontWeight.w600),
+        style: TextStyle(color: t.text, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           hintText: label,
-          hintStyle: TextStyle(color: const Color(0xFF2A2750).withOpacity(0.4), fontSize: 14),
-          prefixIcon: Icon(icon, color: const Color(0xFF7C6BE0), size: 22),
+          hintStyle: TextStyle(color: t.text.withOpacity(0.3), fontSize: 14),
+          prefixIcon: Icon(icon, color: t.button, size: 22),
           suffixIcon: isPassword ? IconButton(
-            icon: Icon(_obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: const Color(0xFF2A2750).withOpacity(0.3), size: 20),
+            icon: Icon(_obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: t.text.withOpacity(0.2)),
             onPressed: () => setState(() => _obscure = !_obscure),
           ) : null,
           border: InputBorder.none,
@@ -267,23 +265,62 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+
+  Widget _buildBackButton(AppThemeData t) => IconButton(
+    onPressed: () => Navigator.pop(context),
+    icon: Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(color: t.card.withOpacity(0.5), shape: BoxShape.circle),
+      child: Icon(Icons.arrow_back_ios_new_rounded, color: t.button, size: 18),
+    ),
+  );
+
+  Widget _buildErrorBox(AppThemeData t) => Container(
+    padding: const EdgeInsets.all(12),
+    margin: const EdgeInsets.only(bottom: 20),
+    decoration: BoxDecoration(color: Colors.red.withOpacity(0.08), borderRadius: BorderRadius.circular(15)),
+    child: Row(children: [
+      const Icon(Icons.error_outline, color: Colors.red, size: 20),
+      const SizedBox(width: 10),
+      Expanded(child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w500))),
+    ]),
+  );
+
+  Widget _buildToggleAuth(AppThemeData t) => Center(
+    child: TextButton(
+      onPressed: () => setState(() => _isLogin = !_isLogin),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(fontFamily: 'Tajawal', color: t.text, fontSize: 14),
+          children: [
+            TextSpan(text: _isLogin ? 'ليس لديك حساب؟ ' : 'لديك حساب بالفعل؟ '),
+            TextSpan(text: _isLogin ? 'سجل الآن' : 'ادخل من هنا', style: TextStyle(color: t.button, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  void _showSuccess(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
+  }
+
+  String _mapAuthError(String error) {
+    if (error.contains('Invalid login')) return 'البريد أو كلمة المرور غير صحيحة';
+    if (error.contains('already registered')) return 'هذا البريد مستخدم بالفعل';
+    return error;
+  }
 }
 
 class _BlurOrb extends StatelessWidget {
   final Color color;
   final double size;
   const _BlurOrb({required this.color, required this.size});
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [BoxShadow(color: color, blurRadius: 40, spreadRadius: 20)],
-      ),
+      width: size, height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
