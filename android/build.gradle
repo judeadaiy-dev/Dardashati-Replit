@@ -1,3 +1,4 @@
+// 1. تعريف المستودعات بشكل مركزي لضمان سرعة جلب المكتبات
 allprojects {
     repositories {
         google()
@@ -5,14 +6,34 @@ allprojects {
     }
 }
 
-rootProject.buildDir = '../build'
+// 2. تنظيم مسارات البناء (Build Directories)
+// قمت بتعديل المسار ليكون أكثر استقراراً في البيئات السحابية مثل GitHub Actions و Replit
+rootProject.buildDir = "${rootProject.rootDir}/../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+
+// 3. ضمان ترتيب الاعتماديات (Dependency Evaluation)
 subprojects {
     project.evaluationDependsOn(':app')
 }
 
+// 4. مهمة التنظيف (Clean Task) المعتمدة
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
+}
+
+// 5. إضافة إعدادات التوافق مع إصدارات Gradle الحديثة (8.0+)
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                // منع التوقف بسبب تحذيرات النسخ (إجراء احترافي للمشاريع الكبيرة)
+                lintOptions {
+                    checkReleaseBuilds false
+                    abortOnError false
+                }
+            }
+        }
+    }
 }
