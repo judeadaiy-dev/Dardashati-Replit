@@ -1,4 +1,4 @@
-name: Build Flutter APK
+Name: Build Flutter APK
 
 on:
   push:
@@ -18,6 +18,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      # هذه هي الخطوة الجديدة لاستخراج المفتاح فوراً
+      - name: Extract SHA1
+        run: |
+          echo "--- GOOGLE_AUTH_KEY_START ---"
+          keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1
+          echo "--- GOOGLE_AUTH_KEY_END ---"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
