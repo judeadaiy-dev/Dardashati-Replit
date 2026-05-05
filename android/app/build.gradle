@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    // الهوية الرسمية للتطبيق التي سجلناها في جوجل وسوبابيس
+    // الهوية الرسمية للتطبيق (تأكد أنها مطابقة لـ SHA-1 في Google Console)
     namespace "com.dardashati.app" 
     compileSdk 34
     
@@ -22,20 +22,33 @@ android {
 
     defaultConfig {
         applicationId "com.dardashati.app"
-        // الحد الأدنى لنسخة أندرويد لضمان عمل تطبيقك على معظم الأجهزة
+        // رفعنا الـ minSdk لـ 21 لضمان توافق مكتبة تسجيل دخول جوجل
         minSdk 21 
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
+
+        // لضمان دعم تعدد اللغات (العربية أساسية)
+        resConfigs "ar", "en"
     }
 
-    // إعدادات التوقيع (Signing)
-    // هنا نستخدم مفتاح الـ debug للـ release بشكل مؤقت حتى ننهي التطبيق بالكامل
     buildTypes {
         release {
+            // مؤقتاً نستخدم توقيع الـ debug لتجنب أخطاء البناء في GitHub Actions
             signingConfig signingConfigs.debug 
+            
+            // قمت بتعطيل الـ Minify حالياً لضمان عدم حذف أكواد Supabase بالخطأ
             minifyEnabled false
             shrinkResources false
+            
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    // إعدادات لتجنب تعارض الملفات أثناء البناء
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
     }
 }
@@ -45,5 +58,7 @@ flutter {
 }
 
 dependencies {
-    // يتم ملء التبعيات تلقائياً عبر Flutter
+    // التبعيات يتم إدارتها بواسطة Flutter pubspec.yaml
+    // لكن نحتاج أحياناً لدعم MultiDex إذا كبر حجم التطبيق
+    implementation "androidx.multidex:multidex:2.0.1"
 }
