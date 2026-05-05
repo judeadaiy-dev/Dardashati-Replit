@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'models.dart';
-import 'services/database_service.dart';
-import 'mock_data.dart';
-import 'profile_screen.dart';
+import 'package:dardashati/models.dart';
+import 'package:dardashati/app_theme.dart';
+import 'package:dardashati/services/database_service.dart';
+import 'package:dardashati/profile_screen.dart';
+import 'package:dardashati/utils/logger.dart';
 
 class RoomChatScreen extends StatefulWidget {
   final AppRoom room;
   final AppUser currentUser;
   final AppThemeData theme;
-  const RoomChatScreen({required this.room, required this.currentUser, required this.theme});
+
+  const RoomChatScreen({
+    super.key, 
+    required this.room, 
+    required this.currentUser, 
+    required this.theme
+  });
 
   @override
   State<RoomChatScreen> createState() => _RoomChatScreenState();
@@ -29,6 +36,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
     super.initState();
     _loadMessages();
     _subscribeRealtime();
+    // تسجيل دخول المستخدم للغرفة (اختياري حسب منطق الداتابيز لديك)
     DatabaseService.joinRoom(widget.room.id);
   }
 
@@ -40,62 +48,65 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
     super.dispose();
   }
 
+  // تحميل الرسائل من السحابة
   Future<void> _loadMessages() async {
     try {
       final msgs = await DatabaseService.getRoomMessages(widget.room.id);
-      if (mounted) setState(() { _messages = msgs; _loading = false; });
-    } catch (_) {
-      if (mounted) setState(() { _messages = List.from(mockMessages); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _messages = msgs;
+          _loading = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      AppLogger.error("ROOM", "فشل تحميل الرسائل", e);
+      if (mounted) setState(() => _loading = false);
     }
-    _scrollToBottom();
   }
 
+  // الاشتراك في التحديثات اللحظية (Real-time)
   void _subscribeRealtime() {
     _channel = DatabaseService.subscribeToRoomMessages(widget.room.id, (record) async {
-      // جلب الرسالة الكاملة مع بيانات المرسل
-      try {
-        final msgs = await DatabaseService.getRoomMessages(widget.room.id);
-        if (mounted) { setState(() => _messages = msgs); _scrollToBottom(); }
-      } catch (_) {
-        // أضف الرسالة مبدئياً بدون بيانات كاملة
-        final msg = AppMessage(
-          id: record['id'] ?? '', senderId: record['sender_id'] ?? '',
-          senderName: '', senderAvatar: '', content: record['content'] ?? '',
-          time: DateTime.tryParse(record['created_at'] ?? '') ?? DateTime.now(),
-        );
-        if (mounted) { setState(() => _messages.add(msg)); _scrollToBottom(); }
-      }
+      // عند وصول رسالة جديدة، نفضل إعادة جلب الرسائل لضمان ظهور بيانات المرسل كاملة
+      _loadMessages(); 
     });
   }
 
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-    });
+    if (_scroll.hasClients) {
+      Future.delayed(const Duration(milliseconds: 200), () {
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent, 
+          duration: const Duration(milliseconds: 300), 
+          curve: Curves.easeOut
+        );
+      });
+    }
   }
 
+  // إرسال الرسالة
   Future<void> _send() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty || _sending) return;
+
     setState(() => _sending = true);
-    _ctrl.clear();
     final replyId = _replyTo?.id;
+    _ctrl.clear();
     setState(() => _replyTo = null);
+
     try {
-      await DatabaseService.sendRoomMessage(roomId: widget.room.id, content: text, replyToId: replyId);
-    } catch (_) {
-      // أضف الرسالة محلياً كـ fallback
-      setState(() {
-        _messages.add(AppMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          senderId: widget.currentUser.id, senderName: widget.currentUser.fullName,
-          senderAvatar: widget.currentUser.avatarUrl, content: text,
-          time: DateTime.now(), replyToContent: _replyTo?.content,
-        ));
-      });
+      await DatabaseService.sendRoomMessage(
+        roomId: widget.room.id, 
+        content: text, 
+        replyToId: replyId
+      );
       _scrollToBottom();
+    } catch (e) {
+      AppLogger.error("ROOM", "فشل إرسال الرسالة", e);
+    } finally {
+      if (mounted) setState(() => _sending = false);
     }
-    if (mounted) setState(() => _sending = false);
   }
 
   @override
@@ -103,161 +114,241 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
     final t = widget.theme;
     return Scaffold(
       backgroundColor: t.background,
-      appBar: AppBar(
-        backgroundColor: t.menu, elevation: 0,
-        leading: IconButton(icon: Icon(Icons.arrow_back_ios, color: t.text), onPressed: () => Navigator.pop(context)),
-        title: Row(children: [
-          Container(width: 40, height: 40, decoration: BoxDecoration(color: t.button.withOpacity(0.15), borderRadius: BorderRadius.circular(12)), child: Center(child: Text(widget.room.icon, style: const TextStyle(fontSize: 20)))),
-          const SizedBox(width: 10),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(widget.room.name, style: TextStyle(color: t.text, fontWeight: FontWeight.bold, fontSize: 15)),
-            Text(widget.room.membersCountLabel, style: TextStyle(color: t.text.withOpacity(0.5), fontSize: 11)),
-          ]),
-        ]),
-        actions: [IconButton(icon: Icon(Icons.people_alt_outlined, color: t.text.withOpacity(0.7)), onPressed: () => _showMembers(context, t))],
-      ),
+      appBar: _buildAppBar(t),
       body: Column(children: [
         Expanded(
           child: _loading
               ? Center(child: CircularProgressIndicator(color: t.button))
-              : ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  itemCount: _messages.length,
-                  itemBuilder: (ctx, i) => _bubble(_messages[i], t),
-                ),
+              : _buildMessagesList(t),
         ),
-        if (_replyTo != null) _replyBar(t),
-        _inputBar(t),
+        if (_replyTo != null) _buildReplyBar(t),
+        _buildInputBar(t),
       ]),
     );
   }
 
-  Widget _bubble(AppMessage msg, AppThemeData t) {
+  // --- أدوات بناء الواجهة ---
+
+  PreferredSizeWidget _buildAppBar(AppThemeData t) {
+    return AppBar(
+      backgroundColor: t.menu,
+      elevation: 0,
+      centerTitle: false,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back_ios_new_rounded, color: t.text, size: 20),
+        onPressed: () => Navigator.pop(context)
+      ),
+      title: Row(children: [
+        Container(
+          width: 42, height: 42,
+          decoration: BoxDecoration(
+            color: t.button.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Center(child: Text(widget.room.icon, style: const TextStyle(fontSize: 22))),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(widget.room.name, style: TextStyle(color: t.text, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Tajawal')),
+            Text(widget.room.membersCountLabel, style: TextStyle(color: t.text.withOpacity(0.4), fontSize: 11)),
+          ]),
+        ),
+      ]),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.info_outline_rounded, color: t.text.withOpacity(0.6)),
+          onPressed: () => _showMembers(context, t)
+        )
+      ],
+    );
+  }
+
+  Widget _buildMessagesList(AppThemeData t) {
+    return ListView.builder(
+      controller: _scroll,
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+      itemCount: _messages.length,
+      itemBuilder: (ctx, i) => _buildMessageBubble(_messages[i], t),
+    );
+  }
+
+  Widget _buildMessageBubble(AppMessage msg, AppThemeData t) {
     final isMe = msg.senderId == widget.currentUser.id;
-    return GestureDetector(
-      onLongPress: () => setState(() => _replyTo = msg),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Row(
-          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (!isMe) ...[
-              GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: msg.senderId, currentUserId: widget.currentUser.id, theme: t))),
-                child: CircleAvatar(backgroundImage: msg.senderAvatar.isNotEmpty ? NetworkImage(msg.senderAvatar) : null, radius: 16, backgroundColor: t.button.withOpacity(0.2), child: msg.senderAvatar.isEmpty ? Text(msg.senderName.isNotEmpty ? msg.senderName[0] : '?', style: TextStyle(color: t.button, fontSize: 12)) : null),
-              ),
-              const SizedBox(width: 8),
-            ],
-            Flexible(child: Column(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) _buildAvatar(msg, t),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
               crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                if (!isMe && msg.senderName.isNotEmpty)
-                  Padding(padding: const EdgeInsets.only(bottom: 4, right: 4, left: 4), child: Text(msg.senderName, style: TextStyle(color: t.button, fontSize: 11, fontWeight: FontWeight.bold))),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isMe ? t.button : t.card,
-                    borderRadius: BorderRadius.only(topLeft: const Radius.circular(18), topRight: const Radius.circular(18), bottomLeft: isMe ? const Radius.circular(18) : const Radius.circular(4), bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(18)),
-                    border: isMe ? null : Border.all(color: t.text.withOpacity(0.08)),
+                if (!isMe) 
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4, right: 4),
+                    child: Text(msg.senderName, style: TextStyle(color: t.button, fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
-                  child: Column(crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [
-                    if (msg.replyToContent != null)
-                      Container(
-                        padding: const EdgeInsets.all(8), margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(color: isMe ? Colors.white.withOpacity(0.15) : t.button.withOpacity(0.1), borderRadius: BorderRadius.circular(10), border: Border(right: BorderSide(color: isMe ? Colors.white.withOpacity(0.5) : t.button, width: 3))),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          if (msg.replyToSender != null) Text(msg.replyToSender!, style: TextStyle(color: isMe ? Colors.white.withOpacity(0.8) : t.button, fontSize: 10, fontWeight: FontWeight.bold)),
-                          Text(msg.replyToContent!, style: TextStyle(color: isMe ? Colors.white.withOpacity(0.7) : t.text.withOpacity(0.6), fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                        ]),
+                GestureDetector(
+                  onLongPress: () => setState(() => _replyTo = msg),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isMe ? t.button : t.card.withOpacity(0.5),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(20),
+                        topRight: const Radius.circular(20),
+                        bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(4),
+                        bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
                       ),
-                    if (msg.isAudio)
-                      Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.play_circle_filled, color: isMe ? Colors.white : t.button, size: 28),
-                        const SizedBox(width: 8),
-                        Container(width: 100, height: 4, decoration: BoxDecoration(color: (isMe ? Colors.white : t.button).withOpacity(0.4), borderRadius: BorderRadius.circular(2))),
-                        const SizedBox(width: 8),
-                        Text(msg.audioDuration ?? '0:00', style: TextStyle(color: isMe ? Colors.white.withOpacity(0.7) : t.text.withOpacity(0.5), fontSize: 11)),
-                      ])
-                    else
-                      Text(msg.content, style: TextStyle(color: isMe ? Colors.white : t.text, fontSize: 14)),
-                  ]),
+                      border: isMe ? null : Border.all(color: Colors.white.withOpacity(0.05)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      children: [
+                        if (msg.replyToContent != null) _buildReplyInBubble(msg, isMe, t),
+                        Text(msg.content, style: TextStyle(color: isMe ? t.buttonText : t.text, fontSize: 14.5, height: 1.4)),
+                      ],
+                    ),
+                  ),
                 ),
-                Padding(padding: const EdgeInsets.only(top: 4, right: 4, left: 4), child: Text(msg.formattedTime, style: TextStyle(color: t.text.withOpacity(0.3), fontSize: 10))),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, right: 4),
+                  child: Text(msg.formattedTime, style: TextStyle(color: t.text.withOpacity(0.3), fontSize: 10)),
+                ),
               ],
-            )),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _replyBar(AppThemeData t) {
+  Widget _buildAvatar(AppMessage msg, AppThemeData t) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: msg.senderId, currentUserId: widget.currentUser.id, theme: t))),
+      child: CircleAvatar(
+        radius: 18,
+        backgroundColor: t.button.withOpacity(0.1),
+        backgroundImage: msg.senderAvatar.isNotEmpty ? NetworkImage(msg.senderAvatar) : null,
+        child: msg.senderAvatar.isEmpty ? Text(msg.senderName[0], style: TextStyle(color: t.button, fontSize: 12)) : null,
+      ),
+    );
+  }
+
+  Widget _buildReplyInBubble(AppMessage msg, bool isMe, AppThemeData t) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: t.menu,
-      child: Row(children: [
-        Container(width: 3, height: 36, color: t.button),
-        const SizedBox(width: 10),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('رداً على', style: TextStyle(color: t.button, fontSize: 11, fontWeight: FontWeight.bold)),
-          Text(_replyTo!.content, style: TextStyle(color: t.text.withOpacity(0.6), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
-        ])),
-        IconButton(icon: Icon(Icons.close, color: t.text.withOpacity(0.5), size: 20), onPressed: () => setState(() => _replyTo = null)),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: (isMe ? Colors.black : t.button).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border(right: BorderSide(color: isMe ? Colors.white70 : t.button, width: 3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(msg.replyToSender ?? "مستخدم", style: TextStyle(color: isMe ? Colors.white : t.button, fontSize: 10, fontWeight: FontWeight.bold)),
+        Text(msg.replyToContent!, style: TextStyle(color: (isMe ? Colors.white : t.text).withOpacity(0.6), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
       ]),
     );
   }
 
-  Widget _inputBar(AppThemeData t) {
+  Widget _buildReplyBar(AppThemeData t) {
     return Container(
-      padding: EdgeInsets.fromLTRB(12, 10, 12, 16 + MediaQuery.of(context).padding.bottom / 2),
-      color: t.menu,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(color: t.menu, border: Border(top: BorderSide(color: t.text.withOpacity(0.05)))),
       child: Row(children: [
-        Expanded(child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(24), border: Border.all(color: t.text.withOpacity(0.08))),
-          child: Row(children: [
-            Expanded(child: TextField(controller: _ctrl, style: TextStyle(color: t.text, fontSize: 14), maxLines: null, textAlign: TextAlign.right, decoration: InputDecoration(hintText: 'اكتب رسالة...', hintStyle: TextStyle(color: t.text.withOpacity(0.3)), border: InputBorder.none), onSubmitted: (_) => _send())),
-            Icon(Icons.emoji_emotions_outlined, color: t.text.withOpacity(0.4), size: 22),
-          ]),
-        )),
-        const SizedBox(width: 10),
+        Container(width: 4, height: 35, decoration: BoxDecoration(color: t.button, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('رداً على ${_replyTo!.senderName}', style: TextStyle(color: t.button, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(_replyTo!.content, style: TextStyle(color: t.text.withOpacity(0.5), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+        ])),
+        IconButton(icon: Icon(Icons.close_rounded, color: t.text.withOpacity(0.3), size: 20), onPressed: () => setState(() => _replyTo = null)),
+      ]),
+    );
+  }
+
+  Widget _buildInputBar(AppThemeData t) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(14, 10, 14, 10 + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(color: t.menu, border: Border(top: BorderSide(color: t.text.withOpacity(0.05)))),
+      child: Row(children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: t.card.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(25),
+            ),
+            child: Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  maxLines: 4, minLines: 1,
+                  style: TextStyle(color: t.text, fontSize: 15),
+                  textAlign: TextAlign.right,
+                  decoration: InputDecoration(hintText: 'اكتب رسالة...', hintStyle: TextStyle(color: t.text.withOpacity(0.2)), border: InputBorder.none),
+                )
+              ),
+              Icon(Icons.sentiment_satisfied_alt_rounded, color: t.text.withOpacity(0.3)),
+            ]),
+          ),
+        ),
+        const SizedBox(width: 12),
         GestureDetector(
           onTap: _send,
-          child: Container(width: 48, height: 48, decoration: BoxDecoration(color: t.button, shape: BoxShape.circle, boxShadow: [BoxShadow(color: t.button.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))]), child: _sending ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: t.buttonText, strokeWidth: 2)) : Icon(Icons.send_rounded, color: t.buttonText, size: 22)),
+          child: Container(
+            width: 50, height: 50,
+            decoration: BoxDecoration(
+              color: t.button, 
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: t.button.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))]
+            ),
+            child: _sending 
+              ? const Padding(padding: EdgeInsets.all(15), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+              : Icon(Icons.send_rounded, color: t.buttonText, size: 22),
+          ),
         ),
       ]),
     );
   }
 
   void _showMembers(BuildContext context, AppThemeData t) async {
-    final members = await DatabaseService.getRoomMembers(widget.room.id).catchError((_) => mockUsers);
+    final members = await DatabaseService.getRoomMembers(widget.room.id).catchError((_) => <AppUser>[]);
     if (!mounted) return;
     showModalBottomSheet(
       context: context, backgroundColor: t.menu,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Column(children: [
-        const SizedBox(height: 12),
-        Container(width: 40, height: 4, decoration: BoxDecoration(color: t.text.withOpacity(0.2), borderRadius: BorderRadius.circular(2))),
-        const SizedBox(height: 16),
-        Text('أعضاء الغرفة', style: TextStyle(color: t.text, fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 12),
-        Expanded(child: ListView.builder(
-          itemCount: members.length,
-          itemBuilder: (ctx, i) {
-            final u = members[i];
-            return ListTile(
-              leading: Stack(children: [
-                CircleAvatar(backgroundImage: u.avatarUrl.isNotEmpty ? NetworkImage(u.avatarUrl) : null, radius: 22, backgroundColor: t.button.withOpacity(0.2)),
-                if (u.isOnline) Positioned(bottom: 0, right: 0, child: Container(width: 10, height: 10, decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: t.menu, width: 2)))),
-              ]),
-              title: Text(u.fullName, style: TextStyle(color: t.text, fontWeight: FontWeight.bold)),
-              subtitle: Text(u.isOnline ? 'متصل' : 'غير متصل', style: TextStyle(color: u.isOnline ? Colors.green : t.text.withOpacity(0.4), fontSize: 12)),
-            );
-          },
-        )),
-      ]),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(children: [
+          Container(width: 40, height: 5, decoration: BoxDecoration(color: t.text.withOpacity(0.1), borderRadius: BorderRadius.circular(10))),
+          const SizedBox(height: 20),
+          Text('المتواجدون في الغرفة', style: TextStyle(color: t.text, fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Tajawal')),
+          const SizedBox(height: 20),
+          Expanded(
+            child: ListView.builder(
+              itemCount: members.length,
+              itemBuilder: (ctx, i) {
+                final u = members[i];
+                return ListTile(
+                  leading: Icon(Icons.arrow_back_ios_new_rounded, size: 12, color: t.text.withOpacity(0.2)),
+                  trailing: CircleAvatar(
+                    backgroundImage: u.avatarUrl.isNotEmpty ? NetworkImage(u.avatarUrl) : null,
+                    child: u.avatarUrl.isEmpty ? Text(u.fullName[0]) : null,
+                  ),
+                  title: Text(u.fullName, textAlign: TextAlign.right, style: TextStyle(color: t.text, fontWeight: FontWeight.bold)),
+                  subtitle: Text(u.isOnline ? 'نشط' : 'بعيد', textAlign: TextAlign.right, style: TextStyle(color: u.isOnline ? Colors.greenAccent : t.text.withOpacity(0.3))),
+                );
+              },
+            ),
+          ),
+        ]),
+      ),
     );
   }
 }
