@@ -1,5 +1,5 @@
-name: tik_chat_app
-description: "تطبيق تيك شات - محادثات آمنة وتصميم راقي"
+name: dardashati 
+description: "دردشاتي: منصة تواصل فورية تجمع بين الأمان الفائق والسرعة المذهلة، مصممة لربط عالمك بخصوصية تامة."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -14,25 +14,23 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
-  # Supabase - قاعدة البيانات والمصادقة والـ Realtime
+  # --- المحرك الأساسي (Supabase & Google) ---
   supabase_flutter: ^2.5.0
+  google_sign_in: ^6.2.1 
 
-  # حفظ بيانات الجلسة محلياً
-  shared_preferences: ^2.2.3
-
-  # خطوط عربية
+  # --- التصميم الفاخر (UI/UX) ---
+  # نستخدم Blur للوصول لتصميم عصري يشبه أنظمة التشغيل الحديثة
+  blur: ^3.1.0 
   google_fonts: ^6.2.1
-
-  # صور الشبكة مع كاش
+  font_awesome_flutter: ^10.7.0 
+  
+  # --- إدارة الوسائط والبيانات ---
   cached_network_image: ^3.3.1
-
-  # اختيار الصور
   image_picker: ^1.1.2
-
-  # مؤشرات التحميل
+  shared_preferences: ^2.2.3
+  
+  # --- تجربة المستخدم التفاعلية ---
   shimmer: ^3.0.0
-
-  # وقت نسبي (منذ 5 دقائق)
   timeago: ^3.6.1
 
 dev_dependencies:
