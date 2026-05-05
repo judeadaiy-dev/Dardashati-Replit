@@ -1,4 +1,4 @@
-Name: Build Dardashati APK
+name: Build Dardashati APK
 
 on:
   push:
@@ -21,18 +21,22 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.6'
-          cache: true # لتسريع البناء في المرات القادمة
+          cache: true
 
       - name: Install Dependencies
-        working-directory: JDAD/dardashati # تحديد مجلد المشروع
-        run: flutter pub get
+        # استخدمنا العمليات المتتالية للتأكد من الدخول للمجلد الصحيح
+        run: |
+          cd JDAD/dardashati
+          flutter pub get
 
       - name: Build APK
-        working-directory: JDAD/dardashati
-        run: flutter build apk --release --no-tree-shake-icons # أضفنا هذا الفلاج لتجنب أخطاء الأيقونات
+        run: |
+          cd JDAD/dardashati
+          flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: dardashati-release-apk
+          # تأكد أن هذا المسار يطابق تماماً مخرجات بناء فلاتر
           path: JDAD/dardashati/build/app/outputs/flutter-apk/app-release.apk
