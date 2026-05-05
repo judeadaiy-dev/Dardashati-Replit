@@ -6,7 +6,7 @@ enum FilterType { all, online, banned, pending }
 
 // ==================== Models ====================
 
-// --- 1. كلاس الرسائل ---
+// --- 1. كلاس الرسائل (الدردشة) ---
 class AppMessage {
   final String id;
   final String senderId;
@@ -39,7 +39,7 @@ class AppMessage {
   }
 }
 
-// --- 2. كلاس المستخدم (تم تحديثه ليدعم الثيم) ---
+// --- 2. كلاس المستخدم ---
 class AppUser {
   final String id;
   final String fullName;
@@ -49,7 +49,7 @@ class AppUser {
   final String? bio;
   final String role; 
   final bool isBanned;
-  final String themePreference; // أضفنا هذا لربطه مع شاشة الإعدادات
+  final String themePreference;
 
   AppUser({
     required this.id,
@@ -80,7 +80,7 @@ class AppUser {
   bool get isAdmin => role == 'admin';
 }
 
-// --- 3. كلاس الإشعارات (هذا ما كان ينقص البناء!) ---
+// --- 3. كلاس الإشعارات (تم تعريفه جذرياً هنا) ---
 class AppNotification {
   final String id;
   final String title;
@@ -105,7 +105,7 @@ class AppNotification {
       body: map['body'] ?? '',
       isRead: map['is_read'] ?? false,
       createdAt: DateTime.parse(map['created_at'] ?? DateTime.now().toIso8601String()),
-      icon: _getIconForType(map['type']),
+      icon: _getIconForType(map['type']?.toString()),
     );
   }
 
@@ -113,6 +113,7 @@ class AppNotification {
     switch (type) {
       case 'message': return Icons.chat_bubble_outline;
       case 'system': return Icons.info_outline;
+      case 'alert': return Icons.warning_amber_rounded;
       default: return Icons.notifications_none;
     }
   }
@@ -172,10 +173,10 @@ class AppReport {
 
   factory AppReport.fromMap(Map<String, dynamic> map) {
     return AppReport(
-      id: map['id'] ?? '',
-      reporterId: map['reporter_id'] ?? '',
-      reportedId: map['reported_id'] ?? '',
-      reason: map['reason'] ?? '',
+      id: map['id']?.toString() ?? '',
+      reporterId: map['reporter_id']?.toString() ?? '',
+      reportedId: map['reported_id']?.toString() ?? '',
+      reason: map['reason']?.toString() ?? '',
       createdAt: DateTime.parse(map['created_at'] ?? DateTime.now().toIso8601String()),
     );
   }
