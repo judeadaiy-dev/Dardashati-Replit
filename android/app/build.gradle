@@ -5,7 +5,6 @@ plugins {
 }
 
 android {
-    // الـ namespace يجب أن يكون بتنسيق نقاط (com.name.app) وليس رابطاً
     namespace "com.dardashati.app" 
     compileSdk 34
     
@@ -21,13 +20,15 @@ android {
     }
 
     defaultConfig {
-        // هذا هو الأهم، يجب أن يتطابق مع ما وضعته في Google Cloud Console
         applicationId "com.dardashati.app"
-        
         minSdk 21
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
+
+        // السطر السحري لاستخراج الكود بدون تيرمنال
+        // سيظهر في سجلات GitHub Actions تحت اسم MY_SHA1_KEY
+        resValue "string", "build_time", "SHA1: " + signingConfigs.debug
     }
 
     buildTypes {
@@ -39,10 +40,13 @@ android {
     }
 }
 
+// السطر الذي وضعته أنت سنضعه هنا ليكون واضحاً في السجلات
+println("MY_SHA1_KEY: " + android.signingConfigs.debug)
+
 flutter {
     source '../..'
 }
 
 dependencies {
-    // يبقى فارغاً كما فضلت
+    // يبقى فارغاً
 }
