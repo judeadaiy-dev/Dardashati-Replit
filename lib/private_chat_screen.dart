@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:blur/blur.dart'; // المكتبة التي أضفناها للتأثير الزجاجي
 
-// الحل الاحترافي: المسارات الصحيحة حسب هيكلة مشروعك
-import 'package:tik_chat_app/models.dart'; 
-import 'package:tik_chat_app/services/database_service.dart';
-import 'package:tik_chat_app/profile_screen.dart'; 
+// استخدام المسار الجديد المعتمد للمشروع
+import 'package:dardashati/models.dart'; 
+import 'package:dardashati/services/database_service.dart';
+import 'package:dardashati/profile_screen.dart'; 
 
 class PrivateChatScreen extends StatefulWidget {
   final String otherUserId;
@@ -31,92 +32,41 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   final _scroll = ScrollController();
   List<AppMessage> _messages = [];
   AppMessage? _replyTo;
-  RealtimeChannel? _channel;
   bool _loading = true;
   bool _sending = false;
-  bool _otherOnline = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
-    _subscribeRealtime();
-    _checkOnlineStatus();
+    _loadInitialMessages();
+    _markAsRead();
+  }
+
+  // ماركة الرسائل كمقروءة فور الدخول
+  void _markAsRead() {
     DatabaseService.markPrivateMessagesRead(widget.otherUserId);
   }
 
-  @override
-  void dispose() {
-    _channel?.unsubscribe();
-    _ctrl.dispose();
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    try {
-      final msgs = await DatabaseService.getPrivateMessages(widget.otherUserId);
-      if (mounted) setState(() { _messages = msgs; _loading = false; });
-    } catch (e) {
-      if (mounted) setState(() { _loading = false; });
-      debugPrint("Error loading messages: $e");
+  // تحميل الرسائل واستخدام الـ Stream للبقاء على اتصال دائم (مثل تليجرام)
+  void _loadInitialMessages() async {
+    // هذه الدالة تجلب الرسائل القديمة مرة واحدة ثم نعتمد على الـ Stream
+    final msgs = await DatabaseService.getPrivateMessages(widget.otherUserId);
+    if (mounted) {
+      setState(() {
+        _messages = msgs;
+        _loading = false;
+      });
+      _scrollToBottom();
     }
-    _scrollToBottom();
-  }
-
-  Future<void> _checkOnlineStatus() async {
-    try {
-      final user = await DatabaseService.getUserById(widget.otherUserId);
-      if (mounted && user != null) setState(() => _otherOnline = user.isOnline);
-    } catch (_) {}
-  }
-
-  void _subscribeRealtime() {
-    // استخدام الدالة الاحترافية التي أضفناها في DatabaseService
-    _channel = DatabaseService.subscribeToPrivateMessages(widget.otherUserId, (record) {
-      if (mounted) {
-        setState(() {
-          _messages.add(AppMessage.fromMap(record));
-        });
-        _scrollToBottom();
-        DatabaseService.markPrivateMessagesRead(widget.otherUserId);
-      }
-    });
   }
 
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.animateTo(
-          _scroll.position.maxScrollExtent, 
-          duration: const Duration(milliseconds: 300), 
-          curve: Curves.easeOut
-        );
-      }
-    });
-  }
-
-  Future<void> _send() async {
-    final text = _ctrl.text.trim();
-    if (text.isEmpty || _sending) return;
-
-    setState(() => _sending = true);
-    final replyId = _replyTo?.id;
-    _ctrl.clear();
-    setState(() => _replyTo = null);
-
-    try {
-      await DatabaseService.sendPrivateMessage(
-        receiverId: widget.otherUserId, 
-        content: text, 
-        replyToId: replyId
+    if (_scroll.hasClients) {
+      _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
       );
-      // في حالة النجاح، الـ Realtime سيتكفل بإضافة الرسالة للقائمة
-    } catch (e) {
-      debugPrint("Send error: $e");
-    } finally {
-      if (mounted) setState(() => _sending = false);
-      _scrollToBottom();
     }
   }
 
@@ -125,142 +75,148 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     final t = widget.theme;
     return Scaffold(
       backgroundColor: t.background,
+      // AppBar بنظام Glassmorphism
       appBar: AppBar(
-        backgroundColor: t.menu, 
+        flexibleSpace: Container().frozen(blur: 10, color: t.menu.withOpacity(0.7)),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: t.text), 
-          onPressed: () => Navigator.pop(context)
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: t.text),
+          onPressed: () => Navigator.pop(context),
         ),
-        title: GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: widget.otherUserId, currentUserId: widget.currentUser.id, theme: t))),
-          child: Row(children: [
-            Stack(children: [
-              CircleAvatar(
-                backgroundImage: widget.otherUserAvatar.isNotEmpty ? NetworkImage(widget.otherUserAvatar) : null, 
-                radius: 18, 
-                backgroundColor: t.button.withOpacity(0.2), 
-                child: widget.otherUserAvatar.isEmpty ? Text(widget.otherUserName[0], style: TextStyle(color: t.button)) : null
-              ),
-              if (_otherOnline) Positioned(bottom: 0, right: 0, child: Container(width: 10, height: 10, decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: t.menu, width: 2)))),
-            ]),
-            const SizedBox(width: 10),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(widget.otherUserName, style: TextStyle(color: t.text, fontWeight: FontWeight.bold, fontSize: 15)),
-              Text(_otherOnline ? 'متصل الآن' : 'غير متصل', style: TextStyle(color: _otherOnline ? Colors.green : t.text.withOpacity(0.4), fontSize: 11)),
-            ]),
-          ]),
-        ),
+        title: _buildAppBarTitle(t),
       ),
-      body: Column(children: [
-        Expanded(
-          child: _loading
-              ? Center(child: CircularProgressIndicator(color: t.button))
-              : ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  itemCount: _messages.length,
-                  itemBuilder: (ctx, i) => _bubble(_messages[i], t),
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  // نستخدم الـ Stream الذي صنعناه في DatabaseService لسرعة الاستجابة
+                  stream: DatabaseService.getMessagesStream(widget.otherUserId),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      // تحويل البيانات القادمة من Stream إلى قائمة رسائل
+                      final newMessages = snapshot.data!
+                          .map((m) => AppMessage.fromMap(m))
+                          .toList();
+                      return ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.all(15),
+                        itemCount: newMessages.length,
+                        itemBuilder: (ctx, i) => _buildMessageBubble(newMessages[i], t),
+                      );
+                    }
+                    return const Center(child: CircularProgressIndicator());
+                  },
                 ),
-        ),
-        if (_replyTo != null) _replyBar(t),
-        _inputBar(t),
-      ]),
+              ),
+              if (_replyTo != null) _buildReplyPreview(t),
+              _buildInputArea(t),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _bubble(AppMessage msg, AppThemeData t) {
+  // تصميم الفقاعة (Bubble) بلمسة راقية
+  Widget _buildMessageBubble(AppMessage msg, AppThemeData t) {
     final isMe = msg.senderId == widget.currentUser.id;
-    return GestureDetector(
-      onLongPress: () => setState(() => _replyTo = msg),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(
-          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (!isMe) ...[
-              CircleAvatar(
-                backgroundImage: msg.senderAvatar != null ? NetworkImage(msg.senderAvatar!) : null, 
-                radius: 14, 
-                backgroundColor: t.button.withOpacity(0.2)
-              ), 
-              const SizedBox(width: 8)
-            ],
-            Flexible(child: Column(
-              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isMe ? t.button : t.card,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(18), 
-                      topRight: const Radius.circular(18), 
-                      bottomLeft: isMe ? const Radius.circular(18) : const Radius.circular(4), 
-                      bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(18)
-                    ),
-                  ),
-                  child: Text(msg.content, style: TextStyle(color: isMe ? t.buttonText : t.text, fontSize: 14)),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
-                  child: Text(
-                    "${msg.time.hour}:${msg.time.minute.toString().padLeft(2, '0')}", 
-                    style: TextStyle(color: t.text.withOpacity(0.3), fontSize: 10)
-                  )
-                ),
-              ],
-            )),
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isMe ? t.button : t.card.withOpacity(0.8),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: Radius.circular(isMe ? 20 : 5),
+            bottomRight: Radius.circular(isMe ? 5 : 20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            )
           ],
         ),
+        child: Text(
+          msg.content,
+          style: TextStyle(
+            color: isMe ? t.buttonText : t.text,
+            fontSize: 15,
+            fontFamily: 'Tajawal', // استخدام الخط العربي الذي أضفناه
+          ),
+          textAlign: TextAlign.right,
+        ),
       ),
     );
   }
 
-  Widget _replyBar(AppThemeData t) {
+  Widget _buildInputArea(AppThemeData t) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), color: t.menu,
-      child: Row(children: [
-        Container(width: 3, height: 36, color: t.button), const SizedBox(width: 10),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('رداً على', style: TextStyle(color: t.button, fontSize: 11, fontWeight: FontWeight.bold)),
-          Text(_replyTo!.content, style: TextStyle(color: t.text.withOpacity(0.6), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
-        ])),
-        IconButton(icon: Icon(Icons.close, color: t.text.withOpacity(0.5), size: 20), onPressed: () => setState(() => _replyTo = null)),
-      ]),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: t.menu.withOpacity(0.8),
+      ).frozen(blur: 15), // تأثير زجاجي لمنطقة الكتابة
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _ctrl,
+              style: TextStyle(color: t.text),
+              decoration: InputDecoration(
+                hintText: "اكتب رسالة...",
+                hintStyle: TextStyle(color: t.text.withOpacity(0.5)),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+              ),
+            ),
+          ),
+          CircleAvatar(
+            backgroundColor: t.button,
+            child: IconButton(
+              icon: const Icon(Icons.send_rounded, color: Colors.white),
+              onPressed: () async {
+                if (_ctrl.text.isNotEmpty) {
+                  final content = _ctrl.text;
+                  _ctrl.clear();
+                  await DatabaseService.sendMessage(widget.otherUserId, content);
+                  _scrollToBottom();
+                }
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _inputBar(AppThemeData t) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(12, 10, 12, 16 + MediaQuery.of(context).padding.bottom / 2),
-      color: t.menu,
-      child: Row(children: [
-        Expanded(child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          decoration: BoxDecoration(color: t.card, borderRadius: BorderRadius.circular(24), border: Border.all(color: t.text.withOpacity(0.08))),
-          child: TextField(
-            controller: _ctrl, 
-            style: TextStyle(color: t.text, fontSize: 14), 
-            textAlign: TextAlign.right, 
-            maxLines: null, 
-            decoration: InputDecoration(hintText: 'اكتب رسالة...', hintStyle: TextStyle(color: t.text.withOpacity(0.3)), border: InputBorder.none),
-          ),
-        )),
-        const SizedBox(width: 10),
-        GestureDetector(
-          onTap: _send,
-          child: Container(
-            width: 48, height: 48, 
-            decoration: BoxDecoration(color: t.button, shape: BoxShape.circle), 
-            child: _sending 
-              ? Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: t.buttonText, strokeWidth: 2))) 
-              : Icon(Icons.send_rounded, color: t.buttonText, size: 22)
-          ),
+  // عنوان الـ AppBar مع حالة المتصل
+  Widget _buildAppBarTitle(AppThemeData t) {
+    return Row(
+      children: [
+        CircleAvatar(
+          backgroundImage: widget.otherUserAvatar.isNotEmpty 
+            ? NetworkImage(widget.otherUserAvatar) 
+            : null,
+          radius: 18,
         ),
-      ]),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.otherUserName, 
+              style: TextStyle(color: t.text, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text("متصل الآن", 
+              style: TextStyle(color: Colors.green, fontSize: 11)),
+          ],
+        ),
+      ],
     );
   }
 }
-
