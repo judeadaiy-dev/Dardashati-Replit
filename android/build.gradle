@@ -1,4 +1,3 @@
-// 1. تعريف الإضافات (Plugins) وإصداراتها بشكل مركزي
 buildscript {
     ext.kotlin_version = '1.9.22'
     repositories {
@@ -6,15 +5,12 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // النسخة 8.2.0 من Android Gradle Plugin تتوافق مع Gradle 8.2
         classpath 'com.android.tools.build:gradle:8.2.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        // إضافة Google Services لتمويل تسجيل دخول جوجل وخدمات سوبابيس/فايربيس
         classpath 'com.google.gms:google-services:4.4.1'
     }
 }
 
-// 2. مستودعات المكتبات لجميع المشاريع الفرعية
 allprojects {
     repositories {
         google()
@@ -22,41 +18,26 @@ allprojects {
     }
 }
 
-// 3. تنظيم مسارات البناء (Build Directories) لبيئة GitHub Actions و Termux
+// تنظيم مسارات البناء
 rootProject.buildDir = "${rootProject.rootDir}/../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
 
-// 4. ضمان ترتيب الاعتماديات
 subprojects {
     project.evaluationDependsOn(':app')
 }
 
-// 5. مهمة التنظيف
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
 
-// 6. إصلاحات التوافق لإصدارات أندرويد الحديثة
+// إصلاح التوافق بطريقة مباشرة (بدون afterEvaluate المسبب للخطأ)
 subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            project.android {
-                // إعدادات الـ Lint لتجنب فشل البناء بسبب تحذيرات ثانوية
-                lintOptions {
-                    checkReleaseBuilds false
-                    abortOnError false
-                }
-                
-                // إضافة مهمة لتعطيل فحص التوقيع في حالة التوقيع يدويًا أو عبر CI
-                if (project.name == 'app') {
-                    tasks.whenTaskAdded { task ->
-                        if (task.name.contains("lint")) {
-                            task.enabled = false
-                        }
-                    }
-                }
+    project.configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'com.android.support' && !details.requested.name.contains('multidex')) {
+                details.useVersion '28.0.0'
             }
         }
     }
