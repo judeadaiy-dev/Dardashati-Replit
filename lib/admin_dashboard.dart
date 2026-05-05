@@ -1,97 +1,108 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:dardashati/models.dart'; // المسار الجديد المعتمد
 
 class DatabaseService {
-  final _supabase = Supabase.instance.client;
+  static final _supabase = Supabase.instance.client;
 
-  // 1. مراقبة الجلسة والبروفايل
-  User? get currentUser => _supabase.auth.currentUser;
+  // 1. إدارة المستخدم الحالي والجلسة
+  static User? get currentUser => _supabase.auth.currentUser;
   
-  // تتبع حالة المستخدم (هل هو مسجل دخول أم لا) لضمان عدم تكرار طلب تسجيل الدخول
-  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+  // دالة لمراقبة تغييرات الدخول/الخروج وتوجيه المستخدم (Auth Gate)
+  static Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
 
-  // 2. تسجيل دخول جوجل مع معالجة الأخطاء (Robust Google Sign-In)
-  Future<AuthResponse?> signInWithGoogle() async {
+  // 2. تسجيل دخول جوجل (النسخة الأكثر استقراراً)
+  static Future<AuthResponse?> signInWithGoogle() async {
     try {
-      // استخدام Client ID الذي تم إنشاؤه في Google Cloud وحفظه في Supabase
       const webClientId = '62134907551-ofam7s8j4m4id3qtdqac6vrk7ui2d2o3.apps.googleusercontent.com';
-
       final googleSignIn = GoogleSignIn(serverClientId: webClientId);
       final googleUser = await googleSignIn.signIn();
       
-      if (googleUser == null) return null; // المستخدم ألغى التسجيل
+      if (googleUser == null) return null;
 
       final googleAuth = await googleUser.authentication;
       
-      // تسجيل الدخول في سوبابيس باستخدام الـ Tokens المستلمة
       return await _supabase.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: googleAuth.idToken!,
         accessToken: googleAuth.accessToken,
       );
     } catch (e) {
-      print('خطأ في تسجيل الدخول: $e');
+      print('خطأ في تسجيل دخول جوجل: $e');
       rethrow;
     }
   }
 
-  // 3. نظام الرسائل المطور (Messages)
-  // تم إضافة 'user_name' و 'avatar_url' لضمان ظهور بيانات المستخدم في الشات فوراً
-  Future<void> sendMessage(String roomId, String content) async {
+  // 3. نظام الرسائل الفورية (Real-time)
+  // ميزة تليجرام: إرسال الرسالة مع دعم الرد (Reply)
+  static Future<void> sendMessage(String receiverId, String content, {String? replyToId}) async {
     if (currentUser == null) return;
 
     await _supabase.from('messages').insert({
-      'room_id': roomId,
-      'content': content,
       'user_id': currentUser!.id,
-      'user_name': currentUser!.userMetadata?['full_name'] ?? 'مستخدم مجهول',
+      'receiver_id': receiverId, // للدردشة الخاصة
+      'content': content,
+      'reply_to_id': replyToId,
+      'user_name': currentUser!.userMetadata?['full_name'] ?? 'مستخدم',
       'avatar_url': currentUser!.userMetadata?['avatar_url'],
     });
   }
 
-  // حذف الرسالة مع التأكد من أن الحاذف هو صاحب الرسالة
-  Future<void> deleteMessage(String messageId) async {
-    await _supabase.from('messages')
-        .delete()
-        .match({'id': messageId, 'user_id': currentUser!.id});
-  }
-
-  // 4. نظام البلاغات والحظر (Reporting & Blocking)
-  // هذا الجزء أساسي للقبول في متاجر التطبيقات (Apple & Google)
-  Future<void> reportUser({
-    required String reportedUserId,
-    required String reason,
-    String? messageContext,
-  }) async {
-    await _supabase.from('reports').insert({
-      'reporter_id': currentUser!.id,
-      'reported_id': reportedUserId,
-      'reason': reason,
-      'context': messageContext, // نص الرسالة التي تم الإبلاغ عنها
-      'created_at': DateTime.now().toIso8601String(),
-    });
-  }
-
-  // حظر مستخدم (لإخفاء رسائله عنك تماماً)
-  Future<void> blockUser(String blockedUserId) async {
-    await _supabase.from('blocks').insert({
-      'blocker_id': currentUser!.id,
-      'blocked_id': blockedUserId,
-    });
-  }
-
-  // 5. جلب بيانات الغرف (Real-time Stream)
-  // ستحتاج هذا لعرض الرسائل وهي تصل فوراً (Live Chat)
-  Stream<List<Map<String, dynamic>>> getMessagesStream(String roomId) {
+  // دالة البث المباشر (Stream) - سرعة تليجرام في وصول الرسائل
+  static Stream<List<Map<String, dynamic>>> getMessagesStream(String otherUserId) {
     return _supabase
         .from('messages')
         .stream(primaryKey: ['id'])
-        .eq('room_id', roomId)
+        .or('user_id.eq.${currentUser!.id},receiver_id.eq.${currentUser!.id}')
         .order('created_at', ascending: true);
   }
 
-  // 6. تسجيل الخروج الكامل
-  Future<void> signOut() async {
+  // 4. نظام الإشعارات (Notifications)
+  static Future<List<AppNotification>> getNotifications() async {
+    final response = await _supabase
+        .from('notifications')
+        .select()
+        .eq('user_id', currentUser!.id)
+        .order('created_at', ascending: false);
+    
+    return (response as List).map((n) => AppNotification(
+      id: n['id'],
+      title: n['title'],
+      body: n['body'],
+      icon: _getIconForType(n['type']),
+      isRead: n['is_read'] ?? false,
+      createdAt: DateTime.parse(n['created_at']),
+    )).toList();
+  }
+
+  // دالة مساعدة لتحديد أيقونة الإشعار
+  static IconData _getIconForType(String? type) {
+    switch (type) {
+      case 'message': return Icons.chat_bubble_outline;
+      case 'system': return Icons.info_outline;
+      default: return Icons.notifications_none;
+    }
+  }
+
+  // 5. حماية المستخدم (Reporting & Blocking)
+  static Future<void> reportUser(String reportedId, String reason) async {
+    await _supabase.from('reports').insert({
+      'reporter_id': currentUser!.id,
+      'reported_id': reportedId,
+      'reason': reason,
+    });
+  }
+
+  static Future<void> markNotificationRead(String id) async {
+    await _supabase.from('notifications').update({'is_read': true}).eq('id', id);
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    await _supabase.from('notifications').update({'is_read': true}).eq('user_id', currentUser!.id);
+  }
+
+  // 6. الخروج
+  static Future<void> signOut() async {
     await GoogleSignIn().signOut();
     await _supabase.auth.signOut();
   }
