@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // حرف i صغير هنا
 
 // ==================== Enums ====================
 enum IconStyle { minimal, bold, soft }
@@ -6,7 +6,6 @@ enum FilterType { all, online, banned, pending }
 
 // ==================== Models ====================
 
-// --- 1. كلاس الرسائل (الدردشة) ---
 class AppMessage {
   final String id;
   final String senderId;
@@ -32,14 +31,13 @@ class AppMessage {
       senderId: map['user_id']?.toString() ?? '',
       content: map['content']?.toString() ?? '',
       time: DateTime.parse(map['created_at'] ?? DateTime.now().toIso8601String()),
-      senderName: map['user_name'],
-      senderAvatar: map['avatar_url'],
-      replyToId: map['reply_to_id'],
+      senderName: map['user_name']?.toString(),
+      senderAvatar: map['avatar_url']?.toString(),
+      replyToId: map['reply_to_id']?.toString(),
     );
   }
 }
 
-// --- 2. كلاس المستخدم ---
 class AppUser {
   final String id;
   final String fullName;
@@ -65,22 +63,21 @@ class AppUser {
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
     return AppUser(
-      id: map['id'] ?? '',
-      fullName: map['full_name'] ?? 'مستخدم جديد',
-      email: map['email'] ?? '', 
-      avatarUrl: map['avatar_url'] ?? '',
+      id: map['id']?.toString() ?? '',
+      fullName: map['full_name']?.toString() ?? 'مستخدم جديد',
+      email: map['email']?.toString() ?? '', 
+      avatarUrl: map['avatar_url']?.toString() ?? '',
       isOnline: map['is_online'] ?? false,
-      bio: map['bio'],
-      role: map['role'] ?? 'user',
+      bio: map['bio']?.toString(),
+      role: map['role']?.toString() ?? 'user',
       isBanned: map['is_banned'] ?? false,
-      themePreference: map['theme_preference'] ?? 'dark',
+      themePreference: map['theme_preference']?.toString() ?? 'dark',
     );
   }
 
   bool get isAdmin => role == 'admin';
 }
 
-// --- 3. كلاس الإشعارات (تم تعريفه جذرياً هنا) ---
 class AppNotification {
   final String id;
   final String title;
@@ -101,8 +98,8 @@ class AppNotification {
   factory AppNotification.fromMap(Map<String, dynamic> map) {
     return AppNotification(
       id: map['id']?.toString() ?? '',
-      title: map['title'] ?? 'إشعار جديد',
-      body: map['body'] ?? '',
+      title: map['title']?.toString() ?? 'إشعار جديد',
+      body: map['body']?.toString() ?? '',
       isRead: map['is_read'] ?? false,
       createdAt: DateTime.parse(map['created_at'] ?? DateTime.now().toIso8601String()),
       icon: _getIconForType(map['type']?.toString()),
@@ -119,7 +116,6 @@ class AppNotification {
   }
 }
 
-// --- 4. كلاس الثيم ---
 class AppThemeData {
   final String name;
   final Color background;
@@ -155,7 +151,6 @@ class AppThemeData {
   );
 }
 
-// --- 5. كلاس البلاغات ---
 class AppReport {
   final String id;
   final String reporterId;
