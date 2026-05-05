@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    // الهوية الرسمية للتطبيق (تأكد أنها مطابقة لـ SHA-1 في Google Console)
+    // الهوية الرسمية للتطبيق - يجب أن تطابق المسجل في Firebase/Supabase
     namespace "com.dardashati.app" 
     compileSdk 34
     
@@ -22,33 +22,22 @@ android {
 
     defaultConfig {
         applicationId "com.dardashati.app"
-        // رفعنا الـ minSdk لـ 21 لضمان توافق مكتبة تسجيل دخول جوجل
         minSdk 21 
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
 
-        // لضمان دعم تعدد اللغات (العربية أساسية)
+        // دعم تعدد اللغات (العربية أساسية)
         resConfigs "ar", "en"
     }
 
     buildTypes {
         release {
-            // مؤقتاً نستخدم توقيع الـ debug لتجنب أخطاء البناء في GitHub Actions
+            // استخدام مفتاح الـ debug مؤقتاً لتسهيل البناء الأولي
             signingConfig signingConfigs.debug 
-            
-            // قمت بتعطيل الـ Minify حالياً لضمان عدم حذف أكواد Supabase بالخطأ
             minifyEnabled false
             shrinkResources false
-            
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-
-    // إعدادات لتجنب تعارض الملفات أثناء البناء
-    packagingOptions {
-        resources {
-            excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
     }
 }
@@ -58,7 +47,9 @@ flutter {
 }
 
 dependencies {
-    // التبعيات يتم إدارتها بواسطة Flutter pubspec.yaml
-    // لكن نحتاج أحياناً لدعم MultiDex إذا كبر حجم التطبيق
-    implementation "androidx.multidex:multidex:2.0.1"
+    // يتم إدارة التبعيات عبر Flutter pubspec.yaml
 }
+
+// تفعيل Plugin خدمات جوجل لقراءة ملف google-services.json
+// ملاحظة: يجب وضع هذا السطر في نهاية الملف تماماً
+apply plugin: 'com.google.gms.google-services'
