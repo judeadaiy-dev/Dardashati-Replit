@@ -23,20 +23,28 @@ jobs:
           flutter-version: '3.19.6'
           cache: true
 
-      - name: Install Dependencies
-        # استخدمنا العمليات المتتالية للتأكد من الدخول للمجلد الصحيح
+      # هذه الخطوة ستحل لغز المسارات؛ ستخبرنا أين يقع ملف pubspec.yaml بالضبط
+      - name: Locate Project Root
         run: |
-          cd JDAD/dardashati
+          echo "Searching for pubspec.yaml..."
+          find . -name "pubspec.yaml"
+
+      - name: Install Dependencies
+        run: |
+          # سنبحث عن المجلد الذي يحتوي على pubspec.yaml وندخل إليه برمجياً
+          PROJECT_ROOT=$(find . -name "pubspec.yaml" -exec dirname {} \;)
+          cd "$PROJECT_ROOT"
           flutter pub get
 
       - name: Build APK
         run: |
-          cd JDAD/dardashati
+          PROJECT_ROOT=$(find . -name "pubspec.yaml" -exec dirname {} \;)
+          cd "$PROJECT_ROOT"
           flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: dardashati-release-apk
-          # تأكد أن هذا المسار يطابق تماماً مخرجات بناء فلاتر
-          path: JDAD/dardashati/build/app/outputs/flutter-apk/app-release.apk
+          # نستخدم النمط العالمي للبحث عن الـ APK المخرجة مهما كان عمق المجلد
+          path: "**/build/app/outputs/flutter-apk/app-release.apk"
