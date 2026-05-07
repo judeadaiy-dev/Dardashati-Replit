@@ -1,73 +1,203 @@
-name: Build Dardashati App V3 - Ultra Force (No Tests)
+name: Build Dardashati Android - Smart Temporary CI
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+permissions:
+  contents: read
 
-      - name: Set up Java 17
+concurrency:
+  group: dardashati-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build APK + AAB with Smart Temporary Repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      JAVA_VERSION: "17"
+      FLUTTER_CHANNEL: "stable"
+      ANDROID_COMPILE_SDK: "35"
+      ANDROID_BUILD_TOOLS: "35.0.0"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-      
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.6'
+          channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
 
-      - name: Extreme Project Cleansing & Repair
+      - name: Install Android SDK components
+        shell: bash
         run: |
-          # البحث عن المجلد الذي يحتوي على pubspec.yaml
-          PROJECT_PATH=$(find . -name "pubspec.yaml" -exec dirname {} \; | head -n 1)
-          echo "PROJECT_PATH=$PROJECT_PATH" >> $GITHUB_ENV
-          
-          cd "$PROJECT_PATH"
-          
-          # 1. حذف مجلد الاختبارات نهائياً
-          rm -rf test
-          
-          # 2. ترقية Gradle لنسخة 8.4 برمجياً
-          if [ -d "android/gradle/wrapper" ]; then
-            sed -i 's/gradle-8.0-all.zip/gradle-8.4-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
-          fi
-          
-          # 3. تعطيل الـ Lint وتجاوز أخطاء البناء في Gradle
-          if [ -f "android/app/build.gradle" ]; then
-            echo "android { lintOptions { checkReleaseBuilds false; abortOnError false } }" >> android/app/build.gradle
+          set -e
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" \
+                     "platforms;android-${ANDROID_COMPILE_SDK}" \
+                     "build-tools;${ANDROID_BUILD_TOOLS}" || true
+
+      - name: Discover Flutter project
+        id: project
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT_PATH="$(find . -name pubspec.yaml -not -path "*/build/*" -exec dirname {} \; | head -n 1)"
+
+          if [ -z "${PROJECT_PATH:-}" ]; then
+            echo "pubspec.yaml not found"
+            exit 1
           fi
 
-          # 4. تصفير ملف التحليل لتجاهل أخطاء Dart
-          echo "analyzer:
+          echo "path=$PROJECT_PATH" >> "$GITHUB_OUTPUT"
+          echo "PROJECT_PATH=$PROJECT_PATH" >> "$GITHUB_ENV"
+
+      - name: Flutter environment diagnostics
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
+        run: |
+          mkdir -p ci_reports
+          flutter --version | tee ci_reports/flutter-version.txt
+          flutter doctor -v | tee ci_reports/flutter-doctor.txt
+
+      - name: Temporary CI repair and validation
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci_reports
+
+          # لو ملفات Android ناقصة نعيد توليدها مؤقتًا داخل الـ runner فقط
+          if [ ! -d android ]; then
+            echo "Android folder missing -> regenerating platform files" | tee -a ci_reports/repair.log
+            flutter create . --platforms=android
+          fi
+
+          # مهم لبعض البيئات
+          if [ -f android/gradlew ]; then
+            chmod +x android/gradlew
+          fi
+
+          # إنشاء local.properties مؤقتًا عند الحاجة
+          if [ ! -f android/local.properties ]; then
+            {
+              echo "sdk.dir=$ANDROID_SDK_ROOT"
+              echo "flutter.sdk=$FLUTTER_ROOT"
+            } > android/local.properties
+          fi
+
+          # تحليل أخف داخل CI بدل تعطيل كل شيء
+          cat > analysis_options.yaml <<'EOF'
+          include: package:flutter_lints/flutter.yaml
+
+          analyzer:
+            exclude:
+              - build/**
             errors:
               todo: ignore
-              unused_local_variable: ignore
-              dead_code: ignore" > analysis_options.yaml
+          EOF
 
-      - name: Force Get Dependencies
+          # إعدادات Gradle آمنة
+          touch android/gradle.properties
+          grep -q '^org.gradle.jvmargs=' android/gradle.properties || echo 'org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' >> android/gradle.properties
+          grep -q '^android.useAndroidX=' android/gradle.properties || echo 'android.useAndroidX=true' >> android/gradle.properties
+          grep -q '^android.enableJetifier=' android/gradle.properties || echo 'android.enableJetifier=true' >> android/gradle.properties
+
+          # نسخ google-services.json تلقائيًا لو موجود في أي مكان داخل المستودع
+          GSRC="$(find . -name google-services.json | head -n 1 || true)"
+          if [ -n "${GSRC:-}" ] && [ ! -f android/app/google-services.json ]; then
+            mkdir -p android/app
+            cp "$GSRC" android/app/google-services.json
+            echo "google-services.json copied from: $GSRC" | tee ci_reports/firebase-check.txt
+          elif [ -f android/app/google-services.json ]; then
+            echo "google-services.json already exists in android/app" | tee ci_reports/firebase-check.txt
+          else
+            echo "google-services.json NOT found" | tee ci_reports/firebase-check.txt
+          fi
+
+          # لو المشروع Groovy نضيف Google Services plugin بشكل مؤقت لو ملف Firebase موجود
+          if [ -f android/app/google-services.json ]; then
+            if [ -f android/build.gradle ] && ! grep -q "com.google.gms:google-services" android/build.gradle; then
+              cat >> android/build.gradle <<'EOF'
+
+          buildscript {
+              dependencies {
+                  classpath 'com.google.gms:google-services:4.4.4'
+              }
+          }
+          EOF
+              echo "Injected google-services classpath into android/build.gradle" >> ci_reports/firebase-check.txt
+            fi
+
+            if [ -f android/app/build.gradle ] && ! grep -q "com.google.gms.google-services" android/app/build.gradle; then
+              echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+              echo "Applied com.google.gms.google-services to android/app/build.gradle" >> ci_reports/firebase-check.txt
+            fi
+
+            if [ -f android/build.gradle.kts ] || [ -f android/app/build.gradle.kts ]; then
+              echo "KTS Gradle files detected: auto injection skipped to avoid breaking plugins block. Manual plugin check may still be required." >> ci_reports/firebase-check.txt
+            fi
+          fi
+
+      - name: Resolve dependencies
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
         run: |
-          cd "${{ env.PROJECT_PATH }}"
-          flutter pub get --no-example
+          set -e
+          flutter clean
+          flutter pub get
+          flutter pub deps --style=compact > ci_reports/pub-deps.txt || true
+          flutter pub outdated > ci_reports/pub-outdated.txt || true
 
-      - name: Build APK (The Ultimate Force)
+      - name: Static analysis report
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
+        continue-on-error: true
         run: |
-          cd "${{ env.PROJECT_PATH }}"
-          flutter build apk --release \
-            --no-tree-shake-icons \
-            --ignore-deprecation \
-            --no-pub
+          flutter analyze --no-pub > ci_reports/flutter-analyze.txt 2>&1 || true
+          dart fix --dry-run > ci_reports/dart-fix-dry-run.txt 2>&1 || true
 
-      - name: Upload APK
+      - name: Build release APKs
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
+        run: |
+          set -e
+          flutter build apk --release --split-per-abi --no-tree-shake-icons --no-pub
+
+      - name: Build release AAB
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
+        run: |
+          set -e
+          flutter build appbundle --release --no-tree-shake-icons --no-pub
+
+      - name: Upload Android artifacts and reports
         uses: actions/upload-artifact@v4
         with:
-          name: dardashati-final-apk
-          path: "**/build/app/outputs/flutter-apk/app-release.apk"
+          name: dardashati-android-build
+          path: |
+            ${{ steps.project.outputs.path }}/build/app/outputs/flutter-apk/*.apk
+            ${{ steps.project.outputs.path }}/build/app/outputs/bundle/release/*.aab
+            ${{ steps.project.outputs.path }}/ci_reports/**
           if-no-files-found: error
